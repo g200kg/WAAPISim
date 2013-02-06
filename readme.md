@@ -2,6 +2,8 @@
 
 WAAPISim is browser's 'Web Audio API' simulator on the 'Audio Data API' that is supported with Firefox. 
 
+**<http://www.g200kg.com/docs/waapisim/>**
+
 ## Current Status
 
 WAAPISim is still not completed. It is tentative and partial implementation.

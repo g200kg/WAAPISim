@@ -3,13 +3,17 @@
 // http://www.g200kg.com/
 //         Licensed under The MIT-License
 //         http://opensource.org/licenses/MIT
+//
+//  Great thanks :
+//  FFT algo for AnalyserNode is based on Takuya OOURA's explanation.
+//   http://www.kurims.kyoto-u.ac.jp/~ooura/fftman/index.html
 
 function waapisimSetup() {
 	if(typeof(webkitAudioContext)!="undefined")
 		return;
 
 	waapisimAudioBuffer=function(len,ch) {
-		this.sampleRate=48000;
+		this.sampleRate=waapisimSampleRate;
 		this.length=len;
 		this.duration=len/this.sampleRate;
 		this.numberOfChannels=ch;
@@ -23,9 +27,10 @@ function waapisimSetup() {
 			return this.buf[i];
 		}
 	}
+	waapisimSampleRate=44100;
 	waapisimBufSize=1024;
 	waapisimAudio=new Audio();
-	waapisimAudio.mozSetup(2,48000);
+	waapisimAudio.mozSetup(2,waapisimSampleRate);
 	waapisimWrittenpos=0;
 	waapisimNodes=new Array();
 	waapisimDestination=new Array();
@@ -61,7 +66,7 @@ function waapisimSetup() {
 	webkitAudioContext=function() {
 		this.destination=new waapisimAudioDestinationNode(this);
 		waapisimDestination.push(this.destination);
-		this.sampleRate=48000;
+		this.sampleRate=44100;
 		this.currentTime=0;
 		this.activeSourceCount=0;
 		this.createBuffer=function(ch,rate,len) {
@@ -113,6 +118,14 @@ function waapisimSetup() {
 		}
 		this.decodeAudioData=function(audioData,successCallback,errorCallback) {
 		}
+		this.createWaveTable=function(real,imag) {
+			return new waapisimWaveTable(real,imag);
+		}
+	}
+	waapisimWaveTable=function(real,imag) {
+		this.table=new Float32Array(8192);
+		for(var i=0;i<8192;++i)
+			this.table[i]=0;
 	}
 	waapisimAudioNode=function(size) {
 		this.context=null;
@@ -354,8 +367,8 @@ function waapisimSetup() {
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
 		this.delayTime=new waapisimAudioParam(0,1,0);
-		this.bufl=new Float32Array(48000);
-		this.bufr=new Float32Array(48000);
+		this.bufl=new Float32Array(waapisimSampleRate);
+		this.bufr=new Float32Array(waapisimSampleRate);
 		this.index=0;
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
@@ -367,12 +380,12 @@ function waapisimSetup() {
 			for(var i=0;i<waapisimBufSize;++i) {
 				var idxr=this.index-offs;
 				if(idxr<0)
-					idxr+=48000;
+					idxr+=waapisimSampleRate;
 				this.node.outbuf.buf[0][i]=this.bufl[idxr];
 				this.node.outbuf.buf[1][i]=this.bufr[idxr];
 				this.bufl[this.index]=inbuf.buf[0][i];
 				this.bufr[this.index]=inbuf.buf[1][i];
-				if(++this.index>=48000)
+				if(++this.index>=waapisimSampleRate)
 					this.index=0;
 			}
 		}
@@ -400,6 +413,8 @@ function waapisimSetup() {
 		}
 		this.noteOff=function(w) {
 			this.stop(w);
+		}
+		this.setWaveTable=function(tab) {
 		}
 		this.Process=function() {
 			if(this.playbackState!=2) {
@@ -446,21 +461,99 @@ function waapisimSetup() {
 		this.connect=function(dest) {this.node.connect(dest);}
 		this.fftSize=256;
 		this.frequencyBinCount=128;
-		this.minDecibels=0;
-		this.maxDecibels=0;
+		this.minDecibels=-100;
+		this.maxDecibels=-30;
 		this.smoothingTimeConstant=0;
-		this.getByteFrequencyData=function(array) {}
-		this.getFloatFrequencyData=function(array) {}
-		this.getByteTimeDomainData=function(array) {
-			for(var l=array.length,i=0;i<l;++i) {
-				array[i]=(this.node.outbuf.buf[0][i]+this.node.outbuf.buf[1][i])*64+128;
+		this.fftInData=new Array(256);
+		this.fftOutData=new Array(128);
+		this.timeData=new Array(256);
+		this.fftIndex=0;
+		this.fftCurrentSize=0;
+		this.fftrev=new Array(256);
+		this.fft=function(n,data,mag) {
+			var nh=n>>1;
+			var t=-2*Math.PI;
+			var m,mq;
+			for(var mh=1;(m=mh<<1)<=n;mh=m) {
+				mq=mh>>1;
+				t*=0.5;
+				for(var jr=0;jr<n;jr+=m) {
+					var kr=jr+mh;
+					var xr=data[kr];
+					data[kr]=data[jr]-xr;
+					data[jr]+=xr;
+				}
+				for(var i=1;i<mq;++i) {
+					var wr=Math.cos(t*i);
+					var wi=Math.sin(t*i);
+					for(var j=0;j<n;j+=m) {
+						var jr=j+i;
+						var ji=j+mh-i;
+						var kr=j+mh+i;
+						var ki=j+m-i;
+						var xr=wr*data[kr]+wi*data[ki];
+						var xi=wr*data[ki]-wi*data[kr];
+						data[kr]=-data[ji]+xi;
+						data[ki]=data[ji]+xi;
+						data[ji]=data[jr]-xr;
+						data[jr]=data[jr]+xr;
+					}
+				}
 			}
+			for(var i=0;i<n;++i)
+				data[i]=Math.max(1e-100,data[i]/n);
+			mag[0]=mag[0]*this.smoothingTimeConstant+(1-this.smoothingTimeConstant)*data[0];
+			for(var i=1;i<nh;++i) {
+				var v=Math.sqrt(data[i]*data[i]+data[n-i]*data[n-i]);
+				if(v<1e-100)
+					v=1e-100;
+				mag[i]=mag[i]*this.smoothingTimeConstant+(1-this.smoothingTimeConstant)*v;
+			}
+		}
+		this.getByteFrequencyData=function(array) {
+			var range=this.maxDecibels-this.minDecibels;
+			for(var l=Math.min(array.length,this.frequencyBinCount),i=0;i<l;++i) {
+				var v=20*Math.LOG10E*Math.log(this.fftOutData[i]);
+				array[i]=(Math.min(this.maxDecibels,Math.max(this.minDecibels,v))-this.minDecibels)*255/range;
+			}
+		}
+		this.getFloatFrequencyData=function(array) {
+			for(var l=Math.min(array.length,this.frequencyBinCount),i=0;i<l;++i) {
+				array[i]=20*Math.LOG10E*Math.log(this.fftOutData[i]);
+			}
+		}
+		this.getByteTimeDomainData=function(array) {
+			for(var l=Math.min(this.frequencyBinCount,array.length),i=0;i<l;++i)
+				array[i]=this.timeData[i]*127+128;
 		}
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
+			if(this.fftSize!=this.fftCurrentSize) {
+				var n=this.fftSize;
+				for(var i=0;i<n;++i)
+					this.fftOutData[i]=0;
+				this.fftCurrentSize=n;
+				this.frequencyBinCount=n*0.5;
+				this.fftIndex=0;
+				this.fftrev[0]=0;
+				this.fftrev[n-1]=n-1;
+				for(var i=0,j=1;j<n-1;++j) {
+					for(var k=n>>1;k>(i^=k);k>>=1)
+						;
+					this.fftrev[j]=i;
+				}
+			}
 			for(var i=0;i<waapisimBufSize;++i) {
-				this.node.outbuf.buf[0][i]=inbuf.buf[0][i];
-				this.node.outbuf.buf[1][i]=inbuf.buf[1][i];
+				var xl=inbuf.buf[0][i];
+				var xr=inbuf.buf[1][i];
+				this.node.outbuf.buf[0][i]=xl;
+				this.node.outbuf.buf[1][i]=xr;
+				var v=this.timeData[this.fftIndex]=(xl+xr)*0.5;
+				this.fftInData[this.fftrev[this.fftIndex]]=v*(0.5-0.5*Math.cos(2*Math.PI*this.fftIndex/this.fftCurrentSize));
+				if(++this.fftIndex>=this.fftCurrentSize) {
+					this.fftIndex=0;
+					this.fft(this.fftCurrentSize,this.fftInData,this.fftOutData);
+				}
 			}
 		}
 		waapisimNodes.push(this);

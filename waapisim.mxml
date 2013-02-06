@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" creationComplete="Start()">
+   <mx:Script source="waapisim.as"/>
+   <mx:Style>
+      .btn5st { fontSize:16px; }
+   </mx:Style>
+   <mx:VBox horizontalAlign="center" verticalGap="10">
+      <mx:Label id="lbl1" width="150" height="24" text="WAAPISim.swf is loaded."/>
+   </mx:VBox>
+</mx:Application>

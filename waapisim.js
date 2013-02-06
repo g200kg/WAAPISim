@@ -8,10 +8,52 @@
 //  FFT algo for AnalyserNode is based on Takuya OOURA's explanation.
 //   http://www.kurims.kyoto-u.ac.jp/~ooura/fftman/index.html
 
+
+// Support Float32Array if unavailable (for IE9)
+if(typeof(Float32Array)=="undefined") {
+	Float32Array=function(n) {
+		var a=new Array(n);
+		a.subarray=function(x,y) {return this.slice(x,y);}
+		a.set=function(x,off) {for(var i=0;i<x.length;++i) a[off+i]=x[i];}
+		return a;
+	}
+}
+if(typeof(Uint8Array)=="undefined") {
+	Uint8Array=function(n) {
+		var a=new Array(n);
+		a.subarray=function(x,y) {return this.slice(x,y);}
+		a.set=function(x,off) {for(var i=0;i<x.length;++i) a[off+i]=x[i];}
+		return a;
+	}
+}
+
 function waapisimSetup() {
 	if(typeof(webkitAudioContext)!="undefined")
 		return;
 
+	waapisimSampleRate=44100;
+	waapisimAudioIf=0;
+	waapisimBufSize=1024;
+	if(typeof(Audio)!="undefined") {
+		waapisimAudio=new Audio();
+		if(typeof(waapisimAudio.mozSetup)!="undefined")
+			waapisimAudioIf=1;
+	}
+	if(waapisimAudioIf==0) {
+		waapisimOutBufSize=waapisimBufSize*3;
+		waapisimOutBuf=new Array(waapisimOutBufSize);
+	}
+	else {
+		waapisimOutBufSize=waapisimBufSize;
+		waapisimOutBuf=new Float32Array(waapisimOutBufSize*2);
+		waapisimAudio.mozSetup(2,waapisimSampleRate);
+	}
+	for(var l=waapisimOutBuf.length,i=0;i<l;++i)
+		waapisimOutBuf[i]=0;
+	waapisimWrittenpos=0;
+	waapisimCurrentpos=0;
+	waapisimNodes=new Array();
+	waapisimDestination=new Array();
 	waapisimAudioBuffer=function(len,ch) {
 		this.sampleRate=waapisimSampleRate;
 		this.length=len;
@@ -27,42 +69,89 @@ function waapisimSetup() {
 			return this.buf[i];
 		}
 	}
-	waapisimSampleRate=44100;
-	waapisimBufSize=1024;
-	waapisimAudio=new Audio();
-	waapisimAudio.mozSetup(2,waapisimSampleRate);
-	waapisimWrittenpos=0;
-	waapisimNodes=new Array();
-	waapisimDestination=new Array();
-	waapisimOutBuf=new Float32Array(waapisimBufSize*2);
 	waapisimDummybuf=new waapisimAudioBuffer(waapisimBufSize,2);
-	
-	waapisimInterval=function() {
-		var curpos=waapisimAudio.mozCurrentSampleOffset();
-		var buffered=waapisimWrittenpos-curpos;
-		var vl,vr;
-		if(buffered<16384) {
-			if(waapisimDestination.length>0) {
-				var l=waapisimNodes.length;
-				for(var i=0;i<l;++i)
-					waapisimNodes[i].Process();
-				l=waapisimDestination.length;
-				for(var i=0;i<l;++i)
-					waapisimDestination[i].Process();
+
+	waapisimSetupOutBuf=function(offset) {
+		if(waapisimDestination.length>0) {
+			var l=waapisimNodes.length;
+			for(var i=0;i<l;++i)
+				waapisimNodes[i].Process();
+			l=waapisimDestination.length;
+			for(var i=0;i<l;++i)
+				waapisimDestination[i].Process();
+			if(waapisimAudioIf==0) {
 				for(var i=0;i<waapisimBufSize;++i) {
 					vl=vr=0;
 					for(var j=0;j<l;++j) {
 						vl+=waapisimDestination[j].node.outbuf.buf[0][i];
 						vr+=waapisimDestination[j].node.outbuf.buf[1][i];
 					}
-					waapisimOutBuf[i*2]=vl;
-					waapisimOutBuf[i*2+1]=vr;
+					waapisimOutBuf[i+offset]=(vl+vr)*0.5;
 				}
-				waapisimWrittenpos+=waapisimAudio.mozWriteAudio(waapisimOutBuf);
+			}
+			else {
+				for(var i=0;i<waapisimBufSize;++i) {
+					vl=vr=0;
+					for(var j=0;j<l;++j) {
+						vl+=waapisimDestination[j].node.outbuf.buf[0][i];
+						vr+=waapisimDestination[j].node.outbuf.buf[1][i];
+					}
+					waapisimOutBuf[(i+offset)*2]=vl;
+					waapisimOutBuf[(i+offset)*2+1]=vr;
+				}
 			}
 		}
+	}	
+	waapisimInterval=function() {
+		var curpos=waapisimAudio.mozCurrentSampleOffset();
+		var buffered=waapisimWrittenpos-curpos;
+		var vl,vr;
+		if(buffered<16384) {
+			waapisimSetupOutBuf(0);
+			waapisimWrittenpos+=waapisimAudio.mozWriteAudio(waapisimOutBuf);
+		}
 	}
-	setInterval(waapisimInterval,10);
+	waapisimGetSwfPath=function() {
+		var scr=document.getElementsByTagName("SCRIPT");
+		if(scr&&scr.length>0) {
+			for(var i in scr) {
+				if(scr[i].src && scr[i].src.match(/waapisim\.js$/)) {
+					var s=scr[i].src;
+					return s.substring(0,s.length-2)+"swf";
+				}
+			}
+		}
+		return "";
+	}
+	waapisimAddFlashObj=function() {
+		var div=document.createElement("DIV");
+		div.setAttribute("ID","WAAPISIMFLASHOBJ");
+		var body=document.getElementsByTagName("BODY");
+		body[0].appendChild(div);
+		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=300 height=100>"
+		+"<param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'>"
+		+"<embed src='"+waapisimSwfPath+"' width=300 height=100 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed>"
+		+"</object>";
+	}
+	waapisimFlashOffset=function(pos) {
+		waapisimCurrentpos=pos/1000;
+	}
+	waapisimFlashGetData=function() {
+		waapisimSetupOutBuf(0);
+		waapisimSetupOutBuf(waapisimBufSize);
+		waapisimSetupOutBuf(waapisimBufSize*2);
+		waapisimWrittenpos+=waapisimOutBufSize*2;
+		return waapisimOutBuf;
+	}
+	switch(waapisimAudioIf) {
+	case 0:
+		waapisimSwfPath=waapisimGetSwfPath();
+		window.addEventListener("load",waapisimAddFlashObj,false);
+		break;
+	case 1:
+		setInterval(waapisimInterval,10);
+		break;
+	}
 	webkitAudioContext=function() {
 		this.destination=new waapisimAudioDestinationNode(this);
 		waapisimDestination.push(this.destination);
@@ -148,7 +237,7 @@ function waapisimSetup() {
 				return this.from[0].outbuf;
 			default:
 				var v1,v2;
-				for(var i=0;i<waapisimBufSize;++i) {
+				for(var i=0;i<this.bufsize;++i) {
 					v1=v2=0;
 					for(var j=0;j<fanin;++j) {
 						v1+=this.from[j].outbuf.buf[0][i];
@@ -531,7 +620,7 @@ function waapisimSetup() {
 			if(this.fftSize!=this.fftCurrentSize) {
 				var n=this.fftSize;
 				for(var i=0;i<n;++i)
-					this.fftOutData[i]=0;
+					this.fftInData[i]=this.fftOutData[i]=0;
 				this.fftCurrentSize=n;
 				this.frequencyBinCount=n*0.5;
 				this.fftIndex=0;

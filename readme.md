@@ -20,3 +20,8 @@ WAAPISim is still not completed. It is tentative and partial implementation.
 Load the 'waapisim.js' before using the Web Audio API functions in your html.
 
 `<script type="text/javascript" src="waapisim.js"></script>`
+
+## License
+Copyright (c) 2013 g200kg  
+<http://www.g200kg.com/>  
+Released under the MIT License

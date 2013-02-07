@@ -51,9 +51,8 @@ function waapisimSetup() {
 	for(var l=waapisimOutBuf.length,i=0;i<l;++i)
 		waapisimOutBuf[i]=0;
 	waapisimWrittenpos=0;
-	waapisimCurrentpos=0;
 	waapisimNodes=new Array();
-	waapisimDestination=new Array();
+	waapisimContexts=new Array();
 	waapisimAudioBuffer=function(len,ch) {
 		this.sampleRate=waapisimSampleRate;
 		this.length=len;
@@ -72,40 +71,52 @@ function waapisimSetup() {
 	waapisimDummybuf=new waapisimAudioBuffer(waapisimBufSize,2);
 
 	waapisimSetupOutBuf=function(offset) {
-		if(waapisimDestination.length>0) {
+		var numctx=waapisimContexts.length;
+		if(numctx>0) {
 			var l=waapisimNodes.length;
 			for(var i=0;i<l;++i)
 				waapisimNodes[i].Process();
-			l=waapisimDestination.length;
-			for(var i=0;i<l;++i)
-				waapisimDestination[i].Process();
 			if(waapisimAudioIf==0) {
-				for(var i=0;i<waapisimBufSize;++i) {
-					vl=vr=0;
-					for(var j=0;j<l;++j) {
-						vl+=waapisimDestination[j].node.outbuf.buf[0][i];
-						vr+=waapisimDestination[j].node.outbuf.buf[1][i];
+				for(var j=0;j<numctx;++j) {
+					var buf=waapisimContexts[j].destination.node.outbuf.buf;
+					if(j==0) {
+						for(var i=0;i<waapisimBufSize;++i)
+							waapisimOutBuf[i+offset]=(buf[0][i]+buf[1][i])*0.5;
 					}
-					waapisimOutBuf[i+offset]=(vl+vr)*0.5;
+					else {
+						for(var i=0;i<waapisimBufSize;++i)
+							waapisimOutBuf[i+offset]+=(buf[0][i]+buf[1][i])*0.5;
+					}
 				}
 			}
 			else {
-				for(var i=0;i<waapisimBufSize;++i) {
-					vl=vr=0;
-					for(var j=0;j<l;++j) {
-						vl+=waapisimDestination[j].node.outbuf.buf[0][i];
-						vr+=waapisimDestination[j].node.outbuf.buf[1][i];
+				for(var j=0;j<numctx;++j) {
+					var buf=waapisimContexts[j].destination.node.outbuf.buf;
+					if(j==0) {
+						for(var i=0;i<waapisimBufSize;++i) {
+							waapisimOutBuf[(i+offset)*2]=buf[0][i];
+							waapisimOutBuf[(i+offset)*2+1]=buf[1][i];
+						}
 					}
-					waapisimOutBuf[(i+offset)*2]=vl;
-					waapisimOutBuf[(i+offset)*2+1]=vr;
+					else {
+						for(var i=0;i<waapisimBufSize;++i) {
+							waapisimOutBuf[(i+offset)*2]+=buf[0][i];
+							waapisimOutBuf[(i+offset)*2+1]+=buf[1][i];
+						}
+					}
 				}
 			}
 		}
-	}	
+	}
+	waapisimUpdateCurrentTime=function(t) {
+		for(var i=waapisimContexts.length;i--;)
+			waapisimContexts[i].currentTime=t;
+	}
 	waapisimInterval=function() {
 		var curpos=waapisimAudio.mozCurrentSampleOffset();
 		var buffered=waapisimWrittenpos-curpos;
 		var vl,vr;
+		waapisimUpdateCurrentTime(curpos/(waapisimSampleRate*2));
 		if(buffered<16384) {
 			waapisimSetupOutBuf(0);
 			waapisimWrittenpos+=waapisimAudio.mozWriteAudio(waapisimOutBuf);
@@ -134,7 +145,7 @@ function waapisimSetup() {
 		+"</object>";
 	}
 	waapisimFlashOffset=function(pos) {
-		waapisimCurrentpos=pos/1000;
+		waapisimUpdateCurrentTime(pos/1000);
 	}
 	waapisimFlashGetData=function() {
 		waapisimSetupOutBuf(0);
@@ -152,12 +163,13 @@ function waapisimSetup() {
 		setInterval(waapisimInterval,10);
 		break;
 	}
-	webkitAudioContext=function() {
+	AudioContext=webkitAudioContext=function() {
 		this.destination=new waapisimAudioDestinationNode(this);
-		waapisimDestination.push(this.destination);
+		waapisimContexts.push(this);
 		this.sampleRate=44100;
 		this.currentTime=0;
 		this.activeSourceCount=0;
+		this.listener=new waapisimAudioListener();
 		this.createBuffer=function(ch,rate,len) {
 		}
 		this.createJavaScriptNode=function(bufsize,inch,outch) {
@@ -203,13 +215,23 @@ function waapisimSetup() {
 			return new waapisimChannelMerger(this);
 		}
 		this.createWaveShaper=function() {
-			return new wapisimWaveShaper(this);
+			return new waapisimWaveShaper(this);
 		}
 		this.decodeAudioData=function(audioData,successCallback,errorCallback) {
 		}
 		this.createWaveTable=function(real,imag) {
 			return new waapisimWaveTable(real,imag);
 		}
+	}
+	waapisimAudioListener=function() {
+		this.px=0; this.py=0; this.pz=0;
+		this.ox=0; this.oy=0; this.oz=-1;
+		this.ux=0; this.uy=1; this.uz=0;
+		this.dopplerFactor=1;
+		this.speedOfSound=343.3;
+		this.setPosition=function(x,y,z) {this.px=x;this.py=y;this.pz=z;}
+		this.setOrientation=function(x,y,z,ux,uy,uz) {this.ox=x,this.oy=y;this.oz=z;this.ux=ux;this.uy=uy;this.uz=uz;}
+		this.setVelocity=function(x,y,z) {}
 	}
 	waapisimWaveTable=function(real,imag) {
 		this.table=new Float32Array(8192);
@@ -222,9 +244,21 @@ function waapisimSetup() {
 		this.from=new Array();
 		this.connect=function(input) {
 			if(typeof(input.node)!="undefined")
-				input.node.from.push(this);
+				var target=input.node.from;
 			else
-				input.from.push(this);
+				var target=input.from;
+			for(var i=target.length;i--;)
+				if(target[i]===this)
+					return;
+			target.push(this);
+		}
+		this.disconnect=function() {
+			for(var l=waapisimNodes.length,i=0;i<l;++i) {
+				for(var j=waapisimNodes[i].node.from.length;j--;) {
+					if(waapisimNodes[i].node.from[j]===this)
+						waapisimNodes[i].node.from.splice(j,1);
+				}
+			}
 		}
 		this.outbuf=new waapisimAudioBuffer(size,2);
 		this.inbuf=new waapisimAudioBuffer(size,2);
@@ -260,10 +294,12 @@ function waapisimSetup() {
 		this.maxNumberOfChannels=2;
 		this.numberOfChannels=2;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
 			this.node.outbuf=inbuf;
 		}
+		waapisimNodes.push(this);
 	}
 	waapisimScriptProcessor=function(ctx,bufsize,inch,outch) {
 		this.context=ctx;
@@ -275,6 +311,7 @@ function waapisimSetup() {
 		if(typeof(outch)=="undefined")
 			outch=2;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.bufferSize=bufsize;
 		this.inbuf=new waapisimAudioBuffer(bufsize,inch);
 		this.outbuf=new waapisimAudioBuffer(bufsize,outch);
@@ -312,6 +349,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.type=0;
 		this.frequency=new waapisimAudioParam(10,24000,350);
 		this.detune=new waapisimAudioParam(-1200,1200,0);
@@ -439,6 +477,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.gain=new waapisimAudioParam(0,1,1);
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
@@ -455,6 +494,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.delayTime=new waapisimAudioParam(0,1,0);
 		this.bufl=new Float32Array(waapisimSampleRate);
 		this.bufr=new Float32Array(waapisimSampleRate);
@@ -486,6 +526,7 @@ function waapisimSetup() {
 		this.numberOfInputs=0;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.type=0;
 		this.frequency=new waapisimAudioParam(1,20000,440);
 		this.detune=new waapisimAudioParam(-1200,1200,0);
@@ -508,16 +549,13 @@ function waapisimSetup() {
 		this.Process=function() {
 			if(this.playbackState!=2) {
 				for(var i=0;i<waapisimBufSize;++i)
-					this.node.outbuf[i]=0;
+					this.node.outbuf.buf[0][i]=this.node.outbuf.buf[1][i]=0;
 				return;
 			}
 			var f=Math.abs(this.frequency.Get()*Math.pow(2,this.detune.Get()/1200));
 			var delta=f/this.context.sampleRate;
 			var x1,x2,y,z;
 			switch(this.type) {
-			case 0:
-				x1=0.5; x2=1.5; y=2*Math.PI; z=1/6.78;
-				break;
 			case 1:
 				x1=0.5; x2=1.5; y=100000; z=0;
 				break;
@@ -526,6 +564,10 @@ function waapisimSetup() {
 				break;
 			case 3:
 				x1=0.5; x2=1.5; y=4; z=0;
+				break;
+			case 0:
+			default:
+				x1=0.5; x2=1.5; y=2*Math.PI; z=1/6.78;
 				break;
 			}
 			for(var i=0;i<waapisimBufSize;++i) {
@@ -548,6 +590,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.fftSize=256;
 		this.frequencyBinCount=128;
 		this.minDecibels=-100;
@@ -607,13 +650,14 @@ function waapisimSetup() {
 			}
 		}
 		this.getFloatFrequencyData=function(array) {
-			for(var l=Math.min(array.length,this.frequencyBinCount),i=0;i<l;++i) {
+			for(var l=Math.min(array.length,this.frequencyBinCount),i=0;i<l;++i)
 				array[i]=20*Math.LOG10E*Math.log(this.fftOutData[i]);
-			}
 		}
 		this.getByteTimeDomainData=function(array) {
-			for(var l=Math.min(this.frequencyBinCount,array.length),i=0;i<l;++i)
-				array[i]=this.timeData[i]*127+128;
+			for(var l=Math.min(this.frequencyBinCount,array.length),i=0;i<l;++i) {
+				var v=Math.min(1,Math.max(-1,this.timeData[i]));
+				array[i]=v*127+128;
+			}
 		}
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
@@ -653,6 +697,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.buffer=null;
 		this.normalize=false;
 		this.Process=function() {
@@ -670,6 +715,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.threshold=new waapisimAudioParam(-100,0,-24);
 		this.knee=new waapisimAudioParam(0,40,30);
 		this.ratio=new waapisimAudioParam(1,20,12);
@@ -691,22 +737,53 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.panningModel=0;
-		this.distanceModel=0;
+		this.distanceModel=1;
 		this.refDistance=1;
 		this.maxDistance=10000;
 		this.rolloffFactor=1;
 		this.coneInnerAngle=360;
 		this.coneOuterAngle=360;
 		this.coneOuterGain=0;
-		this.setPosition=function(x,y,z) {}
+		this.px=0;
+		this.py=0;
+		this.pz=0;
+		this.setPosition=function(x,y,z) {this.px=x;this.py=y;this.pz=z;}
 		this.setOrientation=function(x,y,z) {}
 		this.setVelocity=function(x,y,z) {}
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
+			var listener=this.context.listener;
+			var dx=this.px-listener.px;
+			var dy=this.py-listener.py;
+			var dz=this.pz-listener.pz;
+			var d=Math.max(1,Math.sqrt(dx*dx+dy*dy+dz*dz));
+			var rgain=dx-dz;
+			var lgain=-dx-dz;
+			var rl=Math.sqrt(rgain*rgain+lgain*lgain);
+			switch(this.distanceModel) {
+			case 0:
+				var dgain=1-this.rolloffFactor*(d-this.refDistance)/(this.maxDistance-this.refDistance);
+				break;
+			case 1:
+				var dgain=this.refDistance/(this.refDistance+this.rolloffFactor*(d-this.refDistance));
+				break;
+			case 2:
+				var dgain=Math.pow(d/this.refDistance,-this.rolloffFactor);
+				break;
+			}
+			if(rl==0)
+				rgain=lgain=Math.sqrt(2)*dgain;
+			else {
+				rgain=rgain/rl;
+				lgain=lgain/rl;
+				var a=Math.sqrt(rgain*rgain+lgain*lgain);
+				rgain=rgain/a*2*dgain; lgain=lgain/a*2*dgain;
+			}
 			for(var i=0;i<waapisimBufSize;++i) {
-				this.node.outbuf.buf[0][i]=inbuf.buf[0][i];
-				this.node.outbuf.buf[0][i]=inbuf.buf[1][i];
+				this.node.outbuf.buf[0][i]=inbuf.buf[0][i]*lgain;
+				this.node.outbuf.buf[1][i]=inbuf.buf[1][i]*rgain;
 			}
 		}
 		waapisimNodes.push(this);
@@ -717,6 +794,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
 			for(var i=0;i<waapisimBufSize;++i) {
@@ -732,6 +810,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
 			for(var i=0;i<waapisimBufSize;++i) {
@@ -747,6 +826,7 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.connect=function(dest) {this.node.connect(dest);}
+		this.disconnect=function() {this.node.disconnect();}
 		this.curve=null;
 		this.Process=function() {
 			var inbuf=this.node.GetInputBuf();
@@ -754,9 +834,9 @@ function waapisimSetup() {
 				var len=this.curve.length-1;
 				for(var i=0;i<waapisimBufSize;++i) {
 					var xl=Math.max(-1,Math.min(1,inbuf.buf[0][i]));
-					var xr=Math.max(-1,Math.min(1,inbuf.buf[0][i]));
-					xl=this.curve[((xl+1)*len*0.5)|0];
-					xr=this.curve[((xr+1)*len*0.5)|0];
+					var xr=Math.max(-1,Math.min(1,inbuf.buf[1][i]));
+					xl=this.curve[((xl+1)*0.5*len+0.5)|0];
+					xr=this.curve[((xr+1)*0.5*len+0.5)|0];
 					this.node.outbuf.buf[0][i]=xl;
 					this.node.outbuf.buf[1][i]=xr;
 				}
@@ -777,11 +857,17 @@ function waapisimSetup() {
 		this.maxValue=max;
 		this.defaultValue=def;
 		this.from=new Array();
+		this.setValueAtTime=function(v,t) {}
+		this.linearRampToValueAtTime=function(v,t) {}
+		this.exponentialRampToValueAtTime=function(v,t) {}
+		this.setTargetAtTime=function(target,t,c) {}
+		this.setValueCurveAtTime=function(v,t,d) {}
+		this.cancelScheduledValues=function(t) {}
 		this.Get=function() {
 			this.computedValue=this.value;
 			var len=this.from.length;
 			for(var i=0;i<len;++i)
-				this.computedValue+=this.from[i].outbuf[0];
+				this.computedValue+=(this.from[i].outbuf.buf[0][0]+this.from[i].outbuf.buf[1][0])*0.5;
 			return this.computedValue;
 		}
 	}

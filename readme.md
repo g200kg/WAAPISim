@@ -20,7 +20,6 @@ WAAPISim is still not completed. It is tentative and partial implementation.
 * ConvolverNode / DynamicsCompressorNode / ChannelSplitterNode / ChannelMergerNode : Just a dummy. Pass-through from input to output.
 * AudioParam has no automation functions
 * By performance reason, Node to AudioParam contols are executed only 1/1024 samples frequency.
-* In Flash fallbacking mode, audio output is processed as monaural.
 
 ## Usage
 

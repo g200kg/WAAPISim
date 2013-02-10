@@ -1,16 +1,17 @@
 // Web Audio API Simulator
 // Copyright (c) 2013 g200kg
 // http://www.g200kg.com/
-//         Licensed under The MIT-License
+//         Released under the MIT-License
 //         http://opensource.org/licenses/MIT
 //
 //  Great thanks :
 //  FFT algo for AnalyserNode is based on Takuya OOURA's explanation.
 //   http://www.kurims.kyoto-u.ac.jp/~ooura/fftman/index.html
 
+var waapisimLogEnable=0;
 
 // Support Float32Array if unavailable (for IE9)
-if(typeof(Float32Array)=="undefined") {
+if(typeof(Float32Array)==="undefined") {
 	Float32Array=function(n) {
 		var a=new Array(n);
 		a.subarray=function(x,y) {return this.slice(x,y);}
@@ -18,7 +19,7 @@ if(typeof(Float32Array)=="undefined") {
 		return a;
 	}
 }
-if(typeof(Uint8Array)=="undefined") {
+if(typeof(Uint8Array)==="undefined") {
 	Uint8Array=function(n) {
 		var a=new Array(n);
 		a.subarray=function(x,y) {return this.slice(x,y);}
@@ -27,16 +28,21 @@ if(typeof(Uint8Array)=="undefined") {
 	}
 }
 
+if(typeof(waapisimLogEnable)!=="undefined"&&waapisimLogEnable)
+	waapisimDebug=console.log;
+else
+	waapisimDebug=function(){}
+
 function waapisimSetup() {
-	if(typeof(webkitAudioContext)!="undefined")
+	if(typeof(webkitAudioContext)!=="undefined")
 		return;
 
 	waapisimSampleRate=44100;
 	waapisimAudioIf=0;
 	waapisimBufSize=1024;
-	if(typeof(Audio)!="undefined") {
+	if(typeof(Audio)!=="undefined") {
 		waapisimAudio=new Audio();
-		if(typeof(waapisimAudio.mozSetup)!="undefined")
+		if(typeof(waapisimAudio.mozSetup)!=="undefined")
 			waapisimAudioIf=1;
 	}
 	if(waapisimAudioIf==0) {
@@ -51,10 +57,11 @@ function waapisimSetup() {
 	for(var l=waapisimOutBuf.length,i=0;i<l;++i)
 		waapisimOutBuf[i]=0;
 	waapisimWrittenpos=0;
+	waapisimNodeId=0;
 	waapisimNodes=new Array();
 	waapisimContexts=new Array();
 	waapisimAudioBuffer=function(ch,len,rate) {
-		if(typeof(ch)!="number") {
+		if(typeof(ch)!=="number") {
 			this.sampleRate=44100;
 			var buf=new Uint8Array(ch);
 			riff=String.fromCharCode(buf[0],buf[1],buf[2],buf[3]);
@@ -136,41 +143,45 @@ function waapisimSetup() {
 	waapisimRegisterNode=function(node) {
 		for(var i=waapisimNodes.length;i--;)
 			if(waapisimNodes[i]===node)
-				return;
+				return false;
 		waapisimNodes.push(node);
+		return true;
+	}
+	waapisimUnregisterNode=function(node) {
+		for(var i=waapisimNodes.length;i--;) {
+			if(waapisimNodes[i]==node)
+				waapisimNodes.splice(i,1);
+		}
 	}
 	waapisimSetupOutBuf=function(offset) {
 		var numctx=waapisimContexts.length;
 		if(numctx>0) {
-			var l=waapisimNodes.length;
-			var dels=new Array();
-			for(var i=l-1;i>=0;--i) {
-				if(waapisimNodes[i].playbackState==3) {
-					dels.push(waapisimNodes[i]);
-					waapisimNodes.splice(i,1);
+			for(;;) {
+				for(var l=waapisimNodes.length,i=0;i<l;++i) {
+					var node=waapisimNodes[i];
+					if(node.playbackState==3) {
+						node.disconnect();
+						waapisimUnregisterNode(node);
+						break;
+					}
 				}
-				else
-					waapisimNodes[i].Process();
+				if(i==l)
+					break;
 			}
-			for(var i=dels.length;i--;)
-				dels[i].disconnect();
-			var init=0;
+			for(var l=waapisimNodes.length,i=0;i<l;++i) {
+				waapisimNodes[i].Process();
+			}
+			for(var l=(offset+waapisimBufSize)*2,i=offset*2;i<l;i+=2) {
+				waapisimOutBuf[i]=0;
+				waapisimOutBuf[i+1]=0;
+			}
 			for(var j=0;j<numctx;++j) {
 				var node=waapisimContexts[j].destination;
 				if(node.from.length>0) {
 					var buf=node.outbuf.buf;
-					if(init==0) {
-						++init;
-						for(var i=0;i<waapisimBufSize;++i) {
-							waapisimOutBuf[(i+offset)*2]=buf[0][i];
-							waapisimOutBuf[(i+offset)*2+1]=buf[1][i];
-						}
-					}
-					else {
-						for(var i=0;i<waapisimBufSize;++i) {
-							waapisimOutBuf[(i+offset)*2]+=buf[0][i];
-							waapisimOutBuf[(i+offset)*2+1]+=buf[1][i];
-						}
+					for(var i=0;i<waapisimBufSize;++i) {
+						waapisimOutBuf[(i+offset)*2]+=buf[0][i];
+						waapisimOutBuf[(i+offset)*2+1]+=buf[1][i];
 					}
 				}
 			}
@@ -309,33 +320,59 @@ function waapisimSetup() {
 			this.table[i]=0;
 	}
 	waapisimAudioNode=function(size) {
+		this.nodeId=waapisimNodeId++;
 		this.targettype=1;
 		this.context=null;
 		this.bufsize=size;
 		this.from=new Array();
 		this.to=new Array();
 		this.connect=function(input) {
+			waapisimDebug("connect "+this.nodetype+this.nodeId+"=>"+input.nodetype+input.nodeId);
 			for(var i=input.from.length;i--;)
 				if(input.from[i]===this)
 					return;
-			input.from.push(this);
-			if(input.targettype!=0)
-				waapisimRegisterNode(input);
 			this.to.push(input);
+			input.from.push(this);
+			if(input.targettype!=0) {
+				if(waapisimRegisterNode(input)) {
+					for(var l=input.to.length,i=0;i<l;++i) {
+						input.connect(input.to[i]);
+					}
+				}
+				
+			}
 		}
 		this.disconnect=function() {
+			waapisimDebug("disconnect "+this.nodetype+this.nodeId);
+			this.to.length=0;
 			for(var l=waapisimNodes.length,i=0;i<l;++i) {
 				for(var j=waapisimNodes[i].from.length;j--;) {
 					if(waapisimNodes[i].from[j]===this) {
+						waapisimDebug("  :"+this.nodeId+"=>"+waapisimNodes[i].nodeId);
 						waapisimNodes[i].from.splice(j,1);
-						if(waapisimNodes[i].targettype==1) {
-							if(waapisimNodes[i].from.length==0) {
-								waapisimNodes.splice(i,1);
-								--i,--l;
-							}
-						}
 					}
 				}
+			}
+			for(;;) {
+				for(var l=waapisimNodes.length,i=0;i<l;++i) {
+					var node=waapisimNodes[i];
+					if(node.targettype==1 && node.from.length==0) {
+						waapisimDebug("  del "+node.nodeId);
+						for(var ii=0;ii<l;++ii) {
+							var node2=waapisimNodes[ii];
+							for(var jj=node2.from.length;jj--;) {
+								if(node2.from[jj]===node) {
+									waapisimDebug("  :"+node.nodeId+"=>"+node2.nodeId);
+									node2.from.splice(jj,1);
+								}
+							}
+						}
+						waapisimUnregisterNode(node);
+						break;
+					}
+				}
+				if(i==l)
+					break;
 			}
 		}
 		this.outbuf=new waapisimAudioBuffer(2,size,waapisimSampleRate);
@@ -378,6 +415,8 @@ function waapisimSetup() {
 	}
 	waapisimAudioDestinationNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Destination";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.targettype=2;
 		this.context=ctx;
 		this.numberOfInputs=1;
@@ -397,6 +436,8 @@ function waapisimSetup() {
 	
 	waapisimAudioBufferSource=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="BufSrc";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.targettype=3;
 		this.context=ctx;
 		this.numberOfInputs=0;
@@ -429,10 +470,11 @@ function waapisimSetup() {
 				if(this.bufferindex>=this.buffer.length)
 					this.outbuf.buf[0][i]=this.outbuf.buf[1][i]=0;
 				else {
-					this.outbuf.buf[0][i]=b0[this.bufferindex];
-					this.outbuf.buf[1][i]=b1[this.bufferindex];
+					var idx=this.bufferindex|0;
+					this.outbuf.buf[0][i]=b0[idx];
+					this.outbuf.buf[1][i]=b1[idx];
 				}
-				++this.bufferindex;
+				this.bufferindex+=this.playbackRate.Get();
 			}
 		}
 	}
@@ -443,6 +485,8 @@ function waapisimSetup() {
 	
 	waapisimScriptProcessor=function(ctx,bufsize,inch,outch) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="ScrProc";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.targettype=2;
 		this.context=ctx;
 		this.numberOfInputs=1;
@@ -488,6 +532,8 @@ function waapisimSetup() {
 	
 	waapisimBiquadFilter=BiquadFilterNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Filter";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -627,6 +673,8 @@ function waapisimSetup() {
 
 	waapisimGain=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Gain";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -646,6 +694,8 @@ function waapisimSetup() {
 
 	waapisimDelay=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Delay";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -681,6 +731,8 @@ function waapisimSetup() {
 
 	waapisimOscillator=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Osc";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.targettype=3;
 		this.context=ctx;
 		this.numberOfInputs=0;
@@ -748,6 +800,8 @@ function waapisimSetup() {
 	
 	waapisimAnalyser=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Analyser";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -858,6 +912,8 @@ function waapisimSetup() {
 
 	waapisimConvolver=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Convolver";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -879,6 +935,8 @@ function waapisimSetup() {
 
 	waapisimDynamicsCompressor=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="DynComp";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -904,6 +962,8 @@ function waapisimSetup() {
 
 	waapisimPanner=AudioPannerNode=webkitAudioPannerNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Panner";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -970,6 +1030,8 @@ function waapisimSetup() {
 	
 	waapisimChannelSplitter=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="ChSplit";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -989,6 +1051,8 @@ function waapisimSetup() {
 
 	waapisimChannelMerger=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="ChMerge";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
@@ -1008,6 +1072,8 @@ function waapisimSetup() {
 
 	waapisimWaveShaper=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
+		this.nodetype="Shaper";
+		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;

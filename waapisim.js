@@ -141,6 +141,7 @@ function waapisimSetup() {
 	}
 	waapisimDummybuf=new waapisimAudioBuffer(2,waapisimBufSize,waapisimSampleRate);
 	waapisimRegisterNode=function(node) {
+		
 		for(var i=waapisimNodes.length;i--;)
 			if(waapisimNodes[i]===node)
 				return false;
@@ -168,22 +169,20 @@ function waapisimSetup() {
 				if(i==l)
 					break;
 			}
-			for(var l=waapisimNodes.length,i=0;i<l;++i) {
+			for(var l=waapisimNodes.length,i=0;i<l;++i)
 				waapisimNodes[i].Process();
-			}
-			for(var l=(offset+waapisimBufSize)*2,i=offset*2;i<l;i+=2) {
-				waapisimOutBuf[i]=0;
-				waapisimOutBuf[i+1]=0;
-			}
+			for(var l=(offset+waapisimBufSize)*2,i=offset*2;i<l;i+=2)
+				waapisimOutBuf[i]=waapisimOutBuf[i+1]=0;
 			for(var j=0;j<numctx;++j) {
 				var node=waapisimContexts[j].destination;
 				if(node.from.length>0) {
-					var buf=node.outbuf.buf;
+					var buf=node.inbuf.buf;
 					for(var i=0;i<waapisimBufSize;++i) {
 						waapisimOutBuf[(i+offset)*2]+=buf[0][i];
 						waapisimOutBuf[(i+offset)*2+1]+=buf[1][i];
 					}
 				}
+				node.NodeClear();
 			}
 		}
 	}
@@ -326,31 +325,28 @@ function waapisimSetup() {
 		this.bufsize=size;
 		this.from=new Array();
 		this.to=new Array();
-		this.connect=function(input) {
-			waapisimDebug("connect "+this.nodetype+this.nodeId+"=>"+input.nodetype+input.nodeId);
-			for(var i=input.from.length;i--;)
-				if(input.from[i]===this)
-					return;
-			this.to.push(input);
-			input.from.push(this);
-			if(input.targettype!=0) {
-				if(waapisimRegisterNode(input)) {
-					for(var l=input.to.length,i=0;i<l;++i) {
-						input.connect(input.to[i]);
+		this.connect=function(next) {
+			waapisimDebug("connect "+this.nodetype+this.nodeId+"=>"+next.nodetype+next.nodeId);
+			if(next.from.indexOf(this)!=-1)
+				return;
+			if(this.to.indexOf(next)==-1)
+				this.to.push(next);
+			next.from.push(this);
+			if(next.targettype!=0) {
+				if(waapisimRegisterNode(next)) {
+					for(var l=next.to.length,i=0;i<l;++i) {
+						next.connect(next.to[i]);
 					}
 				}
-				
 			}
 		}
 		this.disconnect=function() {
 			waapisimDebug("disconnect "+this.nodetype+this.nodeId);
-			this.to.length=0;
 			for(var l=waapisimNodes.length,i=0;i<l;++i) {
-				for(var j=waapisimNodes[i].from.length;j--;) {
-					if(waapisimNodes[i].from[j]===this) {
-						waapisimDebug("  :"+this.nodeId+"=>"+waapisimNodes[i].nodeId);
-						waapisimNodes[i].from.splice(j,1);
-					}
+				var j=waapisimNodes[i].from.indexOf(this);
+				if(j>=0) {
+					waapisimDebug("  :"+this.nodeId+"=>"+waapisimNodes[i].nodeId);
+					waapisimNodes[i].from.splice(j,1);
 				}
 			}
 			for(;;) {
@@ -360,11 +356,10 @@ function waapisimSetup() {
 						waapisimDebug("  del "+node.nodeId);
 						for(var ii=0;ii<l;++ii) {
 							var node2=waapisimNodes[ii];
-							for(var jj=node2.from.length;jj--;) {
-								if(node2.from[jj]===node) {
-									waapisimDebug("  :"+node.nodeId+"=>"+node2.nodeId);
-									node2.from.splice(jj,1);
-								}
+							var jj=node2.from.indexOf(node);
+							if(jj>=0) {
+								waapisimDebug("  :"+node.nodeId+"=>"+node2.nodeId);
+								node2.from.splice(jj,1);
 							}
 						}
 						waapisimUnregisterNode(node);
@@ -374,41 +369,33 @@ function waapisimSetup() {
 				if(i==l)
 					break;
 			}
+			this.to.length=0;
 		}
 		this.outbuf=new waapisimAudioBuffer(2,size,waapisimSampleRate);
 		this.inbuf=new waapisimAudioBuffer(2,size,waapisimSampleRate);
-		this.GetInputBuf=function() {
-			var fanin=this.from.length;
-			switch(fanin) {
-			case 0:
-				return waapisimDummybuf;
-			case 1:
-				if(this.from[0].playbackState==3)
-					return null;
-				return this.from[0].outbuf;
-			default:
-				var init=0;
-				for(var j=0;j<fanin;++j) {
-					if(this.from[j].playbackState!=3) {
-						if(init==0) {
-							init=1;
-							for(var l=this.bufsize,i=0;i<l;++i) {
-								this.inbuf.buf[0][i]=this.from[j].outbuf.buf[0][i];
-								this.inbuf.buf[1][i]=this.from[j].outbuf.buf[1][i];
-							}
-						}
-						else {
-							for(var l=this.bufsize,i=0;i<l;++i) {
-								this.inbuf.buf[0][i]+=this.from[j].outbuf.buf[0][i];
-								this.inbuf.buf[1][i]+=this.from[j].outbuf.buf[1][i];
-							}
-						}
-					}
-				}
-				if(init==0)
-					return null;
-				return this.inbuf;
+		this.NodeClear=function() {
+			for(var i=0;i<waapisimBufSize;++i)
+				this.inbuf.buf[0][i]=this.inbuf.buf[1][i]=0;
+		}
+		this.NodeEmit=function(idx,v1,v2) {
+			for(var l=this.to.length,i=0;i<l;++i) {
+				var buf=this.to[i].inbuf.buf;
+				buf[0][idx]+=v1;
+				buf[1][idx]+=v2;
 			}
+		}
+		this.NodeEmitBuf=function() {
+			for(var l=this.to.length,i=0;i<l;++i) {
+				var b0=this.to[i].inbuf.buf[0];
+				var b1=this.to[i].inbuf.buf[1];
+				for(var j=0;j<waapisimBufSize;++j) {
+					b0[j]+=this.outbuf.buf[0][j];
+					b1[j]+=this.outbuf.buf[1][j];
+				}
+			}
+		}
+		this.GetInputBuf=function() {
+			return this.inbuf;
 		}
 	}
 	waapisimAudioProcessingEvent=function() {
@@ -425,11 +412,6 @@ function waapisimSetup() {
 		this.maxNumberOfChannels=2;
 		this.numberOfChannels=2;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
-			if(inbuf!=null)
-				this.outbuf=inbuf;
-			else
-				this.outbuf=waapisimDummybuf;
 		}
 		waapisimNodes.push(this);
 	}
@@ -459,22 +441,21 @@ function waapisimSetup() {
 		this.Process=function() {
 			if(this.buffer!=null && this.bufferindex>=this.buffer.length)
 				this.playbackState=3;
-			if(this.playbackState!=2) {
-				for(var i=0;i<waapisimBufSize;++i)
-					this.outbuf.buf[0][i]=this.outbuf.buf[1][i]=0;
+			if(this.playbackState!=2)
 				return;
-			}
 			var b0=this.buffer.getChannelData(0);
 			var b1=this.buffer.getChannelData(1);
-			for(var i=0;i<waapisimBufSize;++i) {
-				if(this.bufferindex>=this.buffer.length)
-					this.outbuf.buf[0][i]=this.outbuf.buf[1][i]=0;
-				else {
-					var idx=this.bufferindex|0;
-					this.outbuf.buf[0][i]=b0[idx];
-					this.outbuf.buf[1][i]=b1[idx];
+			if(this.to.length>0) {
+				for(var i=0;i<waapisimBufSize;++i) {
+					if(this.bufferindex<this.buffer.length) {
+						var idx=this.bufferindex|0;
+						this.outbuf.buf[0][i]=b0[idx];
+						this.outbuf.buf[1][i]=b1[idx];
+					}
+					this.bufferindex+=this.playbackRate.Get(i);
 				}
-				this.bufferindex+=this.playbackRate.Get();
+				this.NodeEmitBuf();
+				this.playbackRate.Clear(false);
 			}
 		}
 	}
@@ -519,17 +500,16 @@ function waapisimSetup() {
 				this.scrinbuf.buf[0][this.index]=inb.buf[0][i];
 				if(this.scrinbuf.numberOfChannels>=2)
 					this.scrinbuf.buf[1][this.index]=inb.buf[1][i];
-				this.outbuf.buf[0][i]=this.scroutbuf.buf[0][this.index];
 				if(this.scroutbuf.numberOfChannels>=2)
-					this.outbuf.buf[1][i]=this.scroutbuf.buf[1][this.index];
+					this.NodeEmit(i,this.scroutbuf.buf[0][this.index],this.scroutbuf.buf[1][this.index]);
 				else
-					this.outbuf.buf[1][i]=this.scroutbuf.buf[0][this.index];
+					this.NodeEmit(i,this.scroutbuf.buf[0][this.index],this.scroutbuf.buf[0][this.index]);
 				this.index++;
 			}
+			this.NodeClear();
 		}
 		waapisimRegisterNode(this);
 	}
-	
 	waapisimBiquadFilter=BiquadFilterNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
 		this.nodetype="Filter";
@@ -547,9 +527,10 @@ function waapisimSetup() {
 		this.b0=this.b1=this.b2=0;
 		this.x1l=this.x1r=this.x2l=this.x2r=0;
 		this.y1l=this.y1r=this.y2l=this.y2r=0;
+		this.NodeClear();
 		this.Setup=function(fil) {
-			var f=fil.frequency.Get()*Math.pow(2,fil.detune.Get()/1200);
-			var q=fil.Q.Get();
+			var f=fil.frequency.Get(0)*Math.pow(2,fil.detune.Get(0)/1200);
+			var q=fil.Q.Get(0);
 			var alpha;
 			var w0=2*Math.PI*f/fil.context.sampleRate;
 			var cos=Math.cos(w0);
@@ -586,7 +567,7 @@ function waapisimSetup() {
 				break;
 			case 3:
 				alpha=Math.sin(w0)/2*Math.sqrt(2);
-				var g=Math.pow(10,fil.gain.Get()/40);
+				var g=Math.pow(10,fil.gain.Get(0)/40);
 				var ra0=1/((g+1)+(g-1)*cos+2*Math.sqrt(g)*alpha);
 				fil.a1=-2*((g-1)+(g+1)*cos)*ra0;
 				fil.a2=((g+1)+(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
@@ -596,7 +577,7 @@ function waapisimSetup() {
 				break;
 			case 4:
 				alpha=Math.sin(w0)/2*Math.sqrt(2);
-				var g=Math.pow(10,fil.gain.Get()/40);
+				var g=Math.pow(10,fil.gain.Get(0)/40);
 				var ra0=1/((g+1)-(g-1)*cos+2*Math.sqrt(g)*alpha);
 				fil.a1=2*((g-1)-(g+1)*cos)*ra0;
 				fil.a2=((g+1)-(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
@@ -607,7 +588,7 @@ function waapisimSetup() {
 			case 5:
 				if(q<0.001) q=0.001;
 				alpha=Math.sin(w0)/(2*q);
-				var g=Math.pow(10,fil.gain.Get()/40);
+				var g=Math.pow(10,fil.gain.Get(0)/40);
 				var ra0=1/(1+alpha/g);
 				fil.a1=-2*cos*ra0;
 				fil.a2=(1-alpha/g)*ra0;
@@ -637,13 +618,9 @@ function waapisimSetup() {
 			}
 		}
 		this.Process=function() {
-			this.Setup(this);
 			var xl,xr,yl,yr;
+			this.Setup(this);
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
 			for(var i=0;i<waapisimBufSize;++i) {
 				xl=inbuf.buf[0][i];
 				xr=inbuf.buf[1][i];
@@ -660,6 +637,12 @@ function waapisimSetup() {
 				this.outbuf.buf[0][i]=yl;
 				this.outbuf.buf[1][i]=yr;
 			}
+			this.NodeEmitBuf();
+			this.NodeClear();
+			this.frequency.Clear(false);
+			this.detune.Clear(false);
+			this.Q.Clear(false);
+			this.gain.Clear(false);
 		}
 	}
 	waapisimBiquadFilter.LOWPASS=waapisimBiquadFilter.prototype.LOWPASS=0;
@@ -680,15 +663,26 @@ function waapisimSetup() {
 		this.numberOfOutputs=1;
 		this.playbackState=0;
 		this.gain=new waapisimAudioParam(0,1,1);
+		this.NodeClear();
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				return;
+			switch(this.to.length) {
+			case 0:
+				break;
+			case 1:
+				var b=this.to[0].inbuf.buf;
+				for(var i=0;i<waapisimBufSize;++i) {
+					b[0][i]+=inbuf.buf[0][i]*this.gain.Get(i);
+					b[1][i]+=inbuf.buf[1][i]*this.gain.Get(i);
+				}
+				break;
+			default:
+				for(var i=0;i<waapisimBufSize;++i) {
+					this.NodeEmit(i,inbuf.buf[0][i]*this.gain.Get(i),inbuf.buf[1][i]*this.gain.Get(i));
+				}
 			}
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.outbuf.buf[0][i]=inbuf.buf[0][i]*this.gain.Get();
-				this.outbuf.buf[1][i]=inbuf.buf[1][i]*this.gain.Get();
-			}
+			this.NodeClear();
+			this.gain.Clear(false);
 		}
 	}
 
@@ -706,11 +700,7 @@ function waapisimSetup() {
 		this.index=0;
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
-			var offs=Math.floor(this.delayTime.Get()*this.context.sampleRate);
+			var offs=Math.floor(this.delayTime.Get(0)*this.context.sampleRate);
 			if(offs<0)
 				offs=0;
 			if(offs>this.context.sampleRate)
@@ -726,6 +716,9 @@ function waapisimSetup() {
 				if(++this.index>=waapisimSampleRate)
 					this.index=0;
 			}
+			this.NodeEmitBuf();
+			this.NodeClear();
+			this.delayTime.Clear(false);
 		}
 	}
 
@@ -757,8 +750,6 @@ function waapisimSetup() {
 					this.outbuf.buf[0][i]=this.outbuf.buf[1][i]=0;
 				return;
 			}
-			var f=Math.abs(this.frequency.Get()*Math.pow(2,this.detune.Get()/1200));
-			var delta=f/this.context.sampleRate;
 			var x1,x2,y,z;
 			switch(this.type) {
 			case 1:
@@ -776,8 +767,13 @@ function waapisimSetup() {
 				break;
 			}
 			for(var i=0;i<waapisimBufSize;++i) {
-				if((this.phase+=delta)>=1)
+				var f=this.frequency.Get(i)*Math.pow(2,this.detune.Get(i)/1200);
+				var delta=f/this.context.sampleRate;
+				this.phase+=delta;
+				while(this.phase>=1)
 					this.phase-=1;
+				while(this.phase<0)
+					this.phase+=1;
 				var t=(Math.min(Math.max(this.phase ,x1-this.phase), x2-this.phase)-0.5)*y;
 				var out=t-t*t*t*z;
 				if(out>1.0)
@@ -786,6 +782,9 @@ function waapisimSetup() {
 					out=-1.0
 				this.outbuf.buf[0][i]=this.outbuf.buf[1][i]=out;
 			}
+			this.NodeEmitBuf();
+			this.frequency.Clear(true);
+			this.detune.Clear(true);
 		}
 	}
 	waapisimOscillator.SINE=waapisimOscillator.prototype.SINE=0;
@@ -876,10 +875,6 @@ function waapisimSetup() {
 		}
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
 			if(this.fftSize!=this.fftCurrentSize) {
 				var n=this.fftSize;
 				for(var i=0;i<n;++i)
@@ -898,8 +893,7 @@ function waapisimSetup() {
 			for(var i=0;i<waapisimBufSize;++i) {
 				var xl=inbuf.buf[0][i];
 				var xr=inbuf.buf[1][i];
-				this.outbuf.buf[0][i]=xl;
-				this.outbuf.buf[1][i]=xr;
+				this.NodeEmit(i,xl,xr);
 				var v=this.timeData[this.fftIndex]=(xl+xr)*0.5;
 				this.fftInData[this.fftrev[this.fftIndex]]=v*(0.5-0.5*Math.cos(2*Math.PI*this.fftIndex/this.fftCurrentSize));
 				if(++this.fftIndex>=this.fftCurrentSize) {
@@ -907,6 +901,7 @@ function waapisimSetup() {
 					this.fft(this.fftCurrentSize,this.fftInData,this.fftOutData);
 				}
 			}
+			this.NodeClear();
 		}
 	}
 
@@ -922,14 +917,9 @@ function waapisimSetup() {
 		this.normalize=false;
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.outbuf.buf[0][i]=inbuf.buf[0][i];
-				this.outbuf.buf[1][i]=inbuf.buf[1][i];
-			}
+			for(var i=0;i<waapisimBufSize;++i)
+				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+			this.NodeClear();
 		}
 	}
 
@@ -949,14 +939,15 @@ function waapisimSetup() {
 		this.release=new waapisimAudioParam(0,1,0.25);
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.outbuf.buf[0][i]=inbuf.buf[0][i];
-				this.outbuf.buf[1][i]=inbuf.buf[1][i];
-			}
+			for(var i=0;i<waapisimBufSize;++i)
+				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+			this.NodeClear();
+			this.threshold.Clear(false);
+			this.knee.Clear(false);
+			this.ratio.Clear(false);
+			this.reduction.Clear(false);
+			this.attack.Clear(false);
+			this.release.Clear(false);
 		}
 	}
 
@@ -984,10 +975,6 @@ function waapisimSetup() {
 		this.setVelocity=function(x,y,z) {}
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
 			var listener=this.context.listener;
 			var dx=this.px-listener.px;
 			var dy=this.py-listener.py;
@@ -1015,10 +1002,9 @@ function waapisimSetup() {
 				var a=Math.sqrt(rgain*rgain+lgain*lgain);
 				rgain=rgain/a*2*dgain; lgain=lgain/a*2*dgain;
 			}
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.outbuf.buf[0][i]=inbuf.buf[0][i]*lgain;
-				this.outbuf.buf[1][i]=inbuf.buf[1][i]*rgain;
-			}
+			for(var i=0;i<waapisimBufSize;++i)
+				this.NodeEmit(i,inbuf.buf[0][i]*lgain,inbuf.buf[1][i]*rgain);
+			this.NodeClear();
 		}
 	}
 	waapisimPanner.EQUALPOWER=waapisimPanner.prototype.EQUALPOWER=0;
@@ -1038,14 +1024,9 @@ function waapisimSetup() {
 		this.playbackState=0;
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.outbuf.buf[0][i]=inbuf.buf[0][i];
-				this.outbuf.buf[1][i]=inbuf.buf[1][i];
-			}
+			for(var i=0;i<waapisimBufSize;++i)
+				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+			this.NodeClear();
 		}
 	}
 
@@ -1059,14 +1040,9 @@ function waapisimSetup() {
 		this.playbackState=0;
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.outbuf.buf[0][i]=inbuf.buf[0][i];
-				this.outbuf.buf[1][i]=inbuf.buf[1][i];
-			}
+			for(var i=0;i<waapisimBufSize;++i)
+				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+			this.NodeClear();
 		}
 	}
 
@@ -1081,10 +1057,6 @@ function waapisimSetup() {
 		this.curve=null;
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			if(inbuf==null) {
-				this.playbackState=3;
-				return;
-			}
 			if(this.curve!=null) {
 				var len=this.curve.length-1;
 				for(var i=0;i<waapisimBufSize;++i) {
@@ -1092,16 +1064,14 @@ function waapisimSetup() {
 					var xr=Math.max(-1,Math.min(1,inbuf.buf[1][i]));
 					xl=this.curve[((xl+1)*0.5*len+0.5)|0];
 					xr=this.curve[((xr+1)*0.5*len+0.5)|0];
-					this.outbuf.buf[0][i]=xl;
-					this.outbuf.buf[1][i]=xr;
+					this.NodeEmit(i,xl,xr);
 				}
 			}
 			else {
-				for(var i=0;i<waapisimBufSize;++i) {
-					this.outbuf.buf[0][i]=inbuf.buf[0][i];
-					this.outbuf.buf[1][i]=inbuf.buf[1][i];
-				}
+				for(var i=0;i<waapisimBufSize;++i)
+					this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
 			}
+			this.NodeClear();
 		}
 	}
 
@@ -1113,18 +1083,29 @@ function waapisimSetup() {
 		this.maxValue=max;
 		this.defaultValue=def;
 		this.from=new Array();
+		this.inbuf={};
+		this.inbuf.buf=new Array();
+		this.inbuf.buf[0]=new Float32Array(waapisimBufSize);
+		this.inbuf.buf[1]=new Float32Array(waapisimBufSize);
+		for(var i=0;i<waapisimBufSize;++i)
+			this.inbuf.buf[0][i]=this.inbuf.buf[1][i]=0;
 		this.setValueAtTime=function(v,t) {}
 		this.linearRampToValueAtTime=function(v,t) {}
 		this.exponentialRampToValueAtTime=function(v,t) {}
 		this.setTargetAtTime=function(target,t,c) {}
 		this.setValueCurveAtTime=function(v,t,d) {}
 		this.cancelScheduledValues=function(t) {}
-		this.Get=function() {
-			this.computedValue=this.value;
-			var len=this.from.length;
-			for(var i=0;i<len;++i)
-				this.computedValue+=(this.from[i].outbuf.buf[0][0]+this.from[i].outbuf.buf[1][0])*0.5;
+		this.Get=function(n) {
+			this.computedValue=this.value+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;
 			return this.computedValue;
+		}
+		this.Clear=function(arate) {
+			if(arate) {
+				for(var i=0;i<waapisimBufSize;++i)
+					this.inbuf.buf[0][i]=this.inbuf.buf[1][i]=0;
+			}
+			else
+				this.inbuf.buf[0][0]=this.inbuf.buf[1][0]=0;
 		}
 	}
 }

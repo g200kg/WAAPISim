@@ -937,10 +937,36 @@ function waapisimSetup() {
 		this.reduction=new waapisimAudioParam(-20,0,0);
 		this.attack=new waapisimAudioParam(0,1,0.003);
 		this.release=new waapisimAudioParam(0,1,0.25);
+		this.maxl=0;
+		this.maxr=0;
+		this.gain=1;
 		this.Process=function() {
 			var inbuf=this.GetInputBuf();
-			for(var i=0;i<waapisimBufSize;++i)
-				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+			var relratio=this.release.Get(0)*waapisimSampleRate;
+			relratio=Math.pow(1/3.16,1/relratio);
+			var atkratio=this.attack.Get(0)*waapisimSampleRate;
+			atkratio=Math.pow(1/3.16,1/atkratio);
+			var reduc=this.reduction.value;
+			var thresh=Math.pow(10,this.threshold.Get(0)/20);
+			var knee=Math.pow(10,this.knee.Get(0)/20*0.5);
+			var makeup=1/Math.sqrt(thresh)/Math.pow(10,this.knee.Get(0)/80);
+			var maxratio=0.99105;
+			var ratio=this.ratio.Get(0);
+			if(ratio<=1)
+				ratio=1;
+			for(var i=0;i<waapisimBufSize;++i) {
+				this.maxl=maxratio*this.maxl+(1-maxratio)*inbuf.buf[0][i]*inbuf.buf[0][i];
+				this.maxr=maxratio*this.maxr+(1-maxratio)*inbuf.buf[1][i]*inbuf.buf[1][i];
+				var maxc=Math.sqrt(Math.max(this.maxl,this.maxr))*1.414;
+				if(maxc>thresh) {
+					var v=Math.pow(thresh*Math.min(knee,maxc/thresh)/maxc,1-1/ratio);
+					this.gain=v+(this.gain-v)*atkratio;
+				}
+				var g=this.gain*makeup;
+				this.NodeEmit(i,inbuf.buf[0][i]*g,inbuf.buf[1][i]*g);
+				this.gain=1+(this.gain-1)*relratio;
+			}
+			this.reduction.value=this.reduction.computedValue=reduc;
 			this.NodeClear();
 			this.threshold.Clear(false);
 			this.knee.Clear(false);

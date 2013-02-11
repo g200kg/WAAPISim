@@ -14,15 +14,16 @@ WAAPISim is still not completed. It is tentative and partial implementation.
 
 * Channels in each nodes should be 1 (mono) or 2(stereo)
 * WaveShaperNode / AnalyserNode / GainNode / BiquadFilterNode / DelayNode : implemented
+* DynamicsCompressorNode : implemented but has a little different characteristics from Chrome's implements.
 * PannerNode : Simplified. Listener position should be stay default. Source positions are interpreted as x-z 2d coordinate (and almost meaningless in Flash fallbacking because it is monaural)
 * ScriptProcessorNode : Implemented. input buffer size should be 1024 and under (No limitation if use output only)
 * AudioBufferSourceNode : Implemented except for looping
 * OscillatorNode : Custom waveform is not implemented
-* ConvolverNode / DynamicsCompressorNode / ChannelSplitterNode / ChannelMergerNode : Just a dummy. Pass-through from input to output.
+* ConvolverNode / ChannelSplitterNode / ChannelMergerNode : Just a dummy. Pass-through from input to output.
 * createBuffer from ArrayBuffer supports only .wav format
 * AudioParam has no automation functions
 * Now a-rate AudioParam is controlled per sample.
-* k-rate AudioParam contols are executed only per 1024 samples frequency.
+* k-rate AudioParam controls are executed only per 1024 samples frequency. a-rate AudioParams are controlled by sample.
 
 ## Usage
 

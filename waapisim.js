@@ -33,20 +33,18 @@ if(typeof(waapisimLogEnable)!=="undefined"&&waapisimLogEnable)
 else
 	waapisimDebug=function(){}
 
-function waapisimSetup() {
-	if(typeof(webkitAudioContext)!=="undefined")
-		return;
-
+if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined") {
 	waapisimSampleRate=44100;
 	waapisimAudioIf=0;
 	waapisimBufSize=1024;
+	waapisimFlashBufSize=1024*3;
 	if(typeof(Audio)!=="undefined") {
 		waapisimAudio=new Audio();
 		if(typeof(waapisimAudio.mozSetup)!=="undefined")
 			waapisimAudioIf=1;
 	}
 	if(waapisimAudioIf==0) {
-		waapisimOutBufSize=waapisimBufSize*3;
+		waapisimOutBufSize=waapisimFlashBufSize;
 		waapisimOutBuf=new Array(waapisimOutBufSize*2);
 	}
 	else {
@@ -141,7 +139,6 @@ function waapisimSetup() {
 	}
 	waapisimDummybuf=new waapisimAudioBuffer(2,waapisimBufSize,waapisimSampleRate);
 	waapisimRegisterNode=function(node) {
-		
 		for(var i=waapisimNodes.length;i--;)
 			if(waapisimNodes[i]===node)
 				return false;
@@ -214,24 +211,25 @@ function waapisimSetup() {
 	}
 	waapisimAddFlashObj=function() {
 		var div=document.createElement("DIV");
-		div.setAttribute("ID","WAAPISIMFLASHOBJ");
+		div.setAttribute("id","WAAPISIMFLASHOBJ");
+		div.setAttribute("style","background:#ff00ff;positoin:static;");
 		var body=document.getElementsByTagName("BODY");
 		body[0].appendChild(div);
-		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=300 height=100>"
+		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<div style='position:fixed;right:0px;bottom:0px'> <object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=150 height=20>"
 		+"<param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'>"
-		+"<embed src='"+waapisimSwfPath+"' width=300 height=100 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed>"
-		+"</object>";
+		+"<embed src='"+waapisimSwfPath+"' width=150 height=20 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed>"
+		+"</object></div>";
 	}
 	waapisimFlashOffset=function(pos) {
 		waapisimUpdateCurrentTime(pos/1000);
 	}
 	waapisimFlashGetData=function() {
-		waapisimSetupOutBuf(0);
-		waapisimSetupOutBuf(waapisimBufSize);
-		waapisimSetupOutBuf(waapisimBufSize*2);
+		for(var l=waapisimOutBufSize/waapisimBufSize,i=0;i<l;++i) {
+			waapisimSetupOutBuf(waapisimBufSize*i);
+		}
 		waapisimWrittenpos+=waapisimOutBufSize*2;
 		var s="";
-		for(var i=0;i<waapisimBufSize*6;++i) {
+		for(var l=waapisimOutBufSize*2,i=0;i<l;++i) {
 			var v=((waapisimOutBuf[i]+1)*32768);
 			if(isNaN(v)) v=32768;
 			v=Math.min(65525,Math.max(1,v))|0;
@@ -394,9 +392,6 @@ function waapisimSetup() {
 				}
 			}
 		}
-		this.GetInputBuf=function() {
-			return this.inbuf;
-		}
 	}
 	waapisimAudioProcessingEvent=function() {
 	}
@@ -426,20 +421,46 @@ function waapisimSetup() {
 		this.numberOfOutputs=1;
 		this.playbackState=0;
 		this.buffer=null;
-		this.playbackRate=new waapisimAudioParam(0,10,1);
+		this.playbackRate=new waapisimAudioParam(ctx,0,10,1);
 		this.loop=false;
 		this.loopStart=0;
 		this.loopEnd=0;
 		this.bufferindex=0;
-		this.start=this.noteOn=function(w) {
-			this.playbackState=2;
+		this.whenstart=0;
+		this.whenstop=Number.MAX_VALUE;
+		this.endindex=0;
+		this.actualLoopStart=0;
+		this.actualLoopEnd=0;
+		this.start=this.noteOn=this.noteGrainOn=function(w,off,dur) {
+			this.playbackState=1;
+			this.whenstart=w;
+			if(off>0)
+				this.bufferindex=off*waapisimSampleRate;
+			this.endindex=this.buffer.length;
+			if(dur>0)
+				this.endindex=Math.min(this.buffer.length,(dur+off)*waapisimSampleRate);
+			if(this.loop) {
+				if((this.loopStart||this.loopEnd)&&this.loopStart>=0&&this.loopEnd>0&&this.loopStart<this.loopEnd) {
+					this.actualLoopStart=this.loopStart;
+					this.actualLoopEnd=Math.min(this.loopEnd,this.buffer.length);
+				}
+				else {
+					this.actualLoopStart=0;
+					this.actualLoopEnd=buffer.length;
+				}
+			}
 			waapisimRegisterNode(this);
 		}
 		this.stop=this.noteOff=function(w) {
-			this.playbackState=3;
+			this.whenstop=w;
 		}
 		this.Process=function() {
-			if(this.buffer!=null && this.bufferindex>=this.buffer.length)
+			this.playbackRate.Process();
+			if(this.buffer!=null && this.bufferindex>=this.endindex)
+				this.playbackState=3;
+			if(this.playbackState==1 && this.context.currentTime>=this.whenstart)
+				this.playbackState=2;
+			if(this.playbackState==2 && this.context.currentTime>=this.whenstop)
 				this.playbackState=3;
 			if(this.playbackState!=2)
 				return;
@@ -447,12 +468,16 @@ function waapisimSetup() {
 			var b1=this.buffer.getChannelData(1);
 			if(this.to.length>0) {
 				for(var i=0;i<waapisimBufSize;++i) {
-					if(this.bufferindex<this.buffer.length) {
+					if(this.bufferindex<this.endindex) {
 						var idx=this.bufferindex|0;
 						this.outbuf.buf[0][i]=b0[idx];
 						this.outbuf.buf[1][i]=b1[idx];
 					}
 					this.bufferindex+=this.playbackRate.Get(i);
+					if(this.loop) {
+						if(this.bufferindex>=this.actualLoopEnd)
+							this.bufferindex=this.actualLoopStart;
+					}
 				}
 				this.NodeEmitBuf();
 				this.playbackRate.Clear(false);
@@ -483,7 +508,7 @@ function waapisimSetup() {
 		this.index=bufsize;
 		this.onaudioprocess=null;
 		this.Process=function() {
-			var inb=this.GetInputBuf();
+			var inb=this.inbuf;
 			if(inb==null)
 				inb=waapisimDummybuf;
 			for(var i=0;i<waapisimBufSize;++i) {
@@ -519,10 +544,10 @@ function waapisimSetup() {
 		this.numberOfOutputs=1;
 		this.playbackState=0;
 		this.type=0;
-		this.frequency=new waapisimAudioParam(10,24000,350);
-		this.detune=new waapisimAudioParam(-1200,1200,0);
-		this.Q=new waapisimAudioParam(0.0001,1000,1);
-		this.gain=new waapisimAudioParam(-40,40,0);
+		this.frequency=new waapisimAudioParam(ctx,10,24000,350);
+		this.detune=new waapisimAudioParam(ctx,-1200,1200,0);
+		this.Q=new waapisimAudioParam(ctx,0.0001,1000,1);
+		this.gain=new waapisimAudioParam(ctx,-40,40,0);
 		this.a1=this.a2=0;
 		this.b0=this.b1=this.b2=0;
 		this.x1l=this.x1r=this.x2l=this.x2r=0;
@@ -619,23 +644,24 @@ function waapisimSetup() {
 		}
 		this.Process=function() {
 			var xl,xr,yl,yr;
+			this.frequency.Process();
+			this.detune.Process();
+			this.Q.Process();
+			this.gain.Process();
 			this.Setup(this);
-			var inbuf=this.GetInputBuf();
+			var inbuf=this.inbuf.buf;
+			var outbuf=this.outbuf.buf;
 			for(var i=0;i<waapisimBufSize;++i) {
-				xl=inbuf.buf[0][i];
-				xr=inbuf.buf[1][i];
+				xl=inbuf[0][i];
+				xr=inbuf[1][i];
 				yl=this.b0*xl+this.b1*this.x1l+this.b2*this.x2l-this.a1*this.y1l-this.a2*this.y2l;
 				yr=this.b0*xr+this.b1*this.x1r+this.b2*this.x2r-this.a1*this.y1r-this.a2*this.y2r;
-				this.x2l=this.x1l;
-				this.x2r=this.x1r;
-				this.x1l=xl;
-				this.x1r=xr;
-				this.y2l=this.y1l;
-				this.y2r=this.y1r;
-				this.y1l=yl;
-				this.y1r=yr;
-				this.outbuf.buf[0][i]=yl;
-				this.outbuf.buf[1][i]=yr;
+				this.x2l=this.x1l; this.x2r=this.x1r;
+				this.x1l=xl; this.x1r=xr;
+				this.y2l=this.y1l; this.y2r=this.y1r;
+				this.y1l=yl; this.y1r=yr;
+				outbuf[0][i]=yl;
+				outbuf[1][i]=yr;
 			}
 			this.NodeEmitBuf();
 			this.NodeClear();
@@ -662,24 +688,25 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.playbackState=0;
-		this.gain=new waapisimAudioParam(0,1,1);
+		this.gain=new waapisimAudioParam(ctx,0,1,1);
 		this.NodeClear();
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			this.gain.Process();
+			var inbuf=this.inbuf.buf;
 			switch(this.to.length) {
 			case 0:
 				break;
 			case 1:
 				var b=this.to[0].inbuf.buf;
 				for(var i=0;i<waapisimBufSize;++i) {
-					b[0][i]+=inbuf.buf[0][i]*this.gain.Get(i);
-					b[1][i]+=inbuf.buf[1][i]*this.gain.Get(i);
+					var g=this.gain.Get(i);
+					b[0][i]+=inbuf[0][i]*g;
+					b[1][i]+=inbuf[1][i]*g;
 				}
 				break;
 			default:
-				for(var i=0;i<waapisimBufSize;++i) {
-					this.NodeEmit(i,inbuf.buf[0][i]*this.gain.Get(i),inbuf.buf[1][i]*this.gain.Get(i));
-				}
+				for(var i=0;i<waapisimBufSize;++i)
+					this.NodeEmit(i,inbuf[0][i]*this.gain.Get(i),inbuf[1][i]*this.gain.Get(i));
 			}
 			this.NodeClear();
 			this.gain.Clear(false);
@@ -694,12 +721,14 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.playbackState=0;
-		this.delayTime=new waapisimAudioParam(0,1,0);
+		this.delayTime=new waapisimAudioParam(ctx,0,1,0);
 		this.bufl=new Float32Array(waapisimSampleRate);
 		this.bufr=new Float32Array(waapisimSampleRate);
 		this.index=0;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			this.delayTime.Process();
+			var inbuf=this.inbuf.buf;
+			var outbuf=this.outbuf.buf;
 			var offs=Math.floor(this.delayTime.Get(0)*this.context.sampleRate);
 			if(offs<0)
 				offs=0;
@@ -709,10 +738,10 @@ function waapisimSetup() {
 				var idxr=this.index-offs;
 				if(idxr<0)
 					idxr+=waapisimSampleRate;
-				this.outbuf.buf[0][i]=this.bufl[idxr];
-				this.outbuf.buf[1][i]=this.bufr[idxr];
-				this.bufl[this.index]=inbuf.buf[0][i];
-				this.bufr[this.index]=inbuf.buf[1][i];
+				outbuf[0][i]=this.bufl[idxr];
+				outbuf[1][i]=this.bufr[idxr];
+				this.bufl[this.index]=inbuf[0][i];
+				this.bufr[this.index]=inbuf[1][i];
 				if(++this.index>=waapisimSampleRate)
 					this.index=0;
 			}
@@ -731,20 +760,29 @@ function waapisimSetup() {
 		this.numberOfInputs=0;
 		this.numberOfOutputs=1;
 		this.type=0;
-		this.frequency=new waapisimAudioParam(1,20000,440);
-		this.detune=new waapisimAudioParam(-1200,1200,0);
+		this.frequency=new waapisimAudioParam(ctx,1,20000,440);
+		this.detune=new waapisimAudioParam(ctx,-1200,1200,0);
 		this.playbackState=0;
 		this.phase=0;
+		this.whenstart=0;
+		this.whenstop=Number.MAX_VALUE;
 		this.start=this.noteOn=function(w) {
-			this.playbackState=2;
+			this.whenstart=w;
+			this.playbackState=1;
 			waapisimRegisterNode(this);
 		}
 		this.stop=this.noteOff=function(w) {
-			this.playbackState=3;
+			this.whenstop=w;
 		}
 		this.setWaveTable=function(tab) {
 		}
 		this.Process=function() {
+			this.frequency.Process();
+			this.detune.Process();
+			if(this.playbackState==1 && this.context.currentTime>=this.whenstart)
+				this.playbackState=2;
+			if(this.playbackState==2 && this.context.currentTime>=this.whenstop)
+				this.playbackState=3;
 			if(this.playbackState!=2) {
 				for(var i=0;i<waapisimBufSize;++i)
 					this.outbuf.buf[0][i]=this.outbuf.buf[1][i]=0;
@@ -874,7 +912,7 @@ function waapisimSetup() {
 			}
 		}
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			var inbuf=this.inbuf.buf;
 			if(this.fftSize!=this.fftCurrentSize) {
 				var n=this.fftSize;
 				for(var i=0;i<n;++i)
@@ -891,8 +929,8 @@ function waapisimSetup() {
 				}
 			}
 			for(var i=0;i<waapisimBufSize;++i) {
-				var xl=inbuf.buf[0][i];
-				var xr=inbuf.buf[1][i];
+				var xl=inbuf[0][i];
+				var xr=inbuf[1][i];
 				this.NodeEmit(i,xl,xr);
 				var v=this.timeData[this.fftIndex]=(xl+xr)*0.5;
 				this.fftInData[this.fftrev[this.fftIndex]]=v*(0.5-0.5*Math.cos(2*Math.PI*this.fftIndex/this.fftCurrentSize));
@@ -904,7 +942,6 @@ function waapisimSetup() {
 			this.NodeClear();
 		}
 	}
-
 	waapisimConvolver=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
 		this.nodetype="Convolver";
@@ -916,13 +953,13 @@ function waapisimSetup() {
 		this.buffer=null;
 		this.normalize=false;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
-			for(var i=0;i<waapisimBufSize;++i)
-				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+			var inbuf=this.inbuf.buf;
+			for(var i=0;i<waapisimBufSize;++i) {
+				this.NodeEmit(i,inbuf[0][i],inbuf[1][i]);
+			}
 			this.NodeClear();
 		}
 	}
-
 	waapisimDynamicsCompressor=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
 		this.nodetype="DynComp";
@@ -931,17 +968,22 @@ function waapisimSetup() {
 		this.numberOfInputs=1;
 		this.numberOfOutputs=1;
 		this.playbackState=0;
-		this.threshold=new waapisimAudioParam(-100,0,-24);
-		this.knee=new waapisimAudioParam(0,40,30);
-		this.ratio=new waapisimAudioParam(1,20,12);
-		this.reduction=new waapisimAudioParam(-20,0,0);
-		this.attack=new waapisimAudioParam(0,1,0.003);
-		this.release=new waapisimAudioParam(0,1,0.25);
+		this.threshold=new waapisimAudioParam(ctx,-100,0,-24);
+		this.knee=new waapisimAudioParam(ctx,0,40,30);
+		this.ratio=new waapisimAudioParam(ctx,1,20,12);
+		this.reduction=new waapisimAudioParam(ctx,-20,0,0);//ReadOnly
+		this.attack=new waapisimAudioParam(ctx,0,1,0.003);
+		this.release=new waapisimAudioParam(ctx,0,1,0.25);
 		this.maxl=0;
 		this.maxr=0;
 		this.gain=1;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			this.threshold.Process();
+			this.knee.Process();
+			this.ratio.Process();
+			this.attack.Process();
+			this.release.Process();
+			var inbuf=this.inbuf.buf;
 			var relratio=this.release.Get(0)*waapisimSampleRate;
 			relratio=Math.pow(1/3.16,1/relratio);
 			var atkratio=this.attack.Get(0)*waapisimSampleRate;
@@ -955,15 +997,15 @@ function waapisimSetup() {
 			if(ratio<=1)
 				ratio=1;
 			for(var i=0;i<waapisimBufSize;++i) {
-				this.maxl=maxratio*this.maxl+(1-maxratio)*inbuf.buf[0][i]*inbuf.buf[0][i];
-				this.maxr=maxratio*this.maxr+(1-maxratio)*inbuf.buf[1][i]*inbuf.buf[1][i];
+				this.maxl=maxratio*this.maxl+(1-maxratio)*inbuf[0][i]*inbuf[0][i];
+				this.maxr=maxratio*this.maxr+(1-maxratio)*inbuf[1][i]*inbuf[1][i];
 				var maxc=Math.sqrt(Math.max(this.maxl,this.maxr))*1.414;
 				if(maxc>thresh) {
 					var v=Math.pow(thresh*Math.min(knee,maxc/thresh)/maxc,1-1/ratio);
 					this.gain=v+(this.gain-v)*atkratio;
 				}
 				var g=this.gain*makeup;
-				this.NodeEmit(i,inbuf.buf[0][i]*g,inbuf.buf[1][i]*g);
+				this.NodeEmit(i,inbuf[0][i]*g,inbuf[1][i]*g);
 				this.gain=1+(this.gain-1)*relratio;
 			}
 			this.reduction.value=this.reduction.computedValue=reduc;
@@ -976,7 +1018,6 @@ function waapisimSetup() {
 			this.release.Clear(false);
 		}
 	}
-
 	waapisimPanner=AudioPannerNode=webkitAudioPannerNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize);
 		this.nodetype="Panner";
@@ -1000,7 +1041,7 @@ function waapisimSetup() {
 		this.setOrientation=function(x,y,z) {}
 		this.setVelocity=function(x,y,z) {}
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			var inbuf=this.inbuf.buf;
 			var listener=this.context.listener;
 			var dx=this.px-listener.px;
 			var dy=this.py-listener.py;
@@ -1029,7 +1070,7 @@ function waapisimSetup() {
 				rgain=rgain/a*2*dgain; lgain=lgain/a*2*dgain;
 			}
 			for(var i=0;i<waapisimBufSize;++i)
-				this.NodeEmit(i,inbuf.buf[0][i]*lgain,inbuf.buf[1][i]*rgain);
+				this.NodeEmit(i,inbuf[0][i]*lgain,inbuf[1][i]*rgain);
 			this.NodeClear();
 		}
 	}
@@ -1049,9 +1090,9 @@ function waapisimSetup() {
 		this.numberOfOutputs=1;
 		this.playbackState=0;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			var inbuf=this.inbuf.buf;
 			for(var i=0;i<waapisimBufSize;++i)
-				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+				this.NodeEmit(i,inbuf[0][i],inbuf[1][i]);
 			this.NodeClear();
 		}
 	}
@@ -1065,9 +1106,9 @@ function waapisimSetup() {
 		this.numberOfOutputs=1;
 		this.playbackState=0;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			var inbuf=this.inbuf.buf;
 			for(var i=0;i<waapisimBufSize;++i)
-				this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+				this.NodeEmit(i,inbuf[0][i],inbuf[1][i]);
 			this.NodeClear();
 		}
 	}
@@ -1082,12 +1123,12 @@ function waapisimSetup() {
 		this.playbackState=0;
 		this.curve=null;
 		this.Process=function() {
-			var inbuf=this.GetInputBuf();
+			var inbuf=this.inbuf.buf;
 			if(this.curve!=null) {
 				var len=this.curve.length-1;
 				for(var i=0;i<waapisimBufSize;++i) {
-					var xl=Math.max(-1,Math.min(1,inbuf.buf[0][i]));
-					var xr=Math.max(-1,Math.min(1,inbuf.buf[1][i]));
+					var xl=Math.max(-1,Math.min(1,inbuf[0][i]));
+					var xr=Math.max(-1,Math.min(1,inbuf[1][i]));
 					xl=this.curve[((xl+1)*0.5*len+0.5)|0];
 					xr=this.curve[((xr+1)*0.5*len+0.5)|0];
 					this.NodeEmit(i,xl,xr);
@@ -1095,13 +1136,13 @@ function waapisimSetup() {
 			}
 			else {
 				for(var i=0;i<waapisimBufSize;++i)
-					this.NodeEmit(i,inbuf.buf[0][i],inbuf.buf[1][i]);
+					this.NodeEmit(i,inbuf[0][i],inbuf[1][i]);
 			}
 			this.NodeClear();
 		}
 	}
-
-	waapisimAudioParam=function(min,max,def) {
+	waapisimAudioParam=function(ctx,min,max,def) {
+		this.context=ctx;
 		this.targettype=0;
 		this.value=def;
 		this.computedValue=def;
@@ -1113,14 +1154,84 @@ function waapisimSetup() {
 		this.inbuf.buf=new Array();
 		this.inbuf.buf[0]=new Float32Array(waapisimBufSize);
 		this.inbuf.buf[1]=new Float32Array(waapisimBufSize);
+		this.automation=new Array();
+		this.deltaAdd=0;
+		this.deltaMul=1;
+		this.deltaTarget=0;
+		this.currentEvent=null;
 		for(var i=0;i<waapisimBufSize;++i)
 			this.inbuf.buf[0][i]=this.inbuf.buf[1][i]=0;
-		this.setValueAtTime=function(v,t) {}
-		this.linearRampToValueAtTime=function(v,t) {}
-		this.exponentialRampToValueAtTime=function(v,t) {}
-		this.setTargetAtTime=function(target,t,c) {}
-		this.setValueCurveAtTime=function(v,t,d) {}
-		this.cancelScheduledValues=function(t) {}
+		this.AddEvent=function(ev) {
+			var t=ev[0];
+			for(var l=this.automation.length,i=0;i<l;++i) {
+				if(this.automation[i][0]>t)
+					break;
+			}
+			this.automation.splice(i,0,ev);
+		}
+		this.setValueAtTime=function(v,t) {
+			this.AddEvent([t,0,v]);
+		}
+		this.linearRampToValueAtTime=function(v,t) {
+			this.AddEvent([t,1,v]);
+		}
+		this.exponentialRampToValueAtTime=function(v,t) {
+			this.AddEvent([t,2,v]);
+		}
+		this.setTargetAtTime=this.setTargetValueAtTime=function(v,t,c) {
+			this.AddEvent([t,3,v,c]);
+		}
+		this.setValueCurveAtTime=function(values,t,d) {
+			this.AddEvent([t,4,values,d]);
+		}
+		this.cancelScheduledValues=function(t) {
+			for(var l=this.automation.length,i=0;i<l;++i) {
+				if(this.automation[i][0]>=t) {
+					this.automation.length=i;
+					return;
+				}
+			}
+		}
+		this.Process=function() {
+			this.value+=this.deltaAdd;
+			this.value=(this.value-this.deltaTarget)*this.deltaMul+this.deltaTarget;
+			if(this.currentEvent!=null) {
+				if(this.currentEvent[1]==4) {
+					var i=(this.currentEvent[2].length-1)*(this.context.currentTime-this.currentEvent[0])/this.currentEvent[3];
+					this.value=this.currentEvent[2][Math.min(this.currentEvent[2].length-1,i)|0];
+				}
+			}
+			if(this.automation.length>0) {
+				if(this.context.currentTime>=this.automation[0][0]) {
+					this.deltaAdd=0;
+					this.deltaMul=1;
+					this.deltaTarget=0;
+					this.currentEvent=this.automation.shift();
+					switch(this.currentEvent[1]) {
+					case 0:
+					case 1:
+					case 2:
+						this.value=this.currentEvent[2];
+						break;
+					case 3:
+						this.deltaMul=Math.pow(0.367879,1/(waapisimSampleRate/waapisimBufSize*this.currentEvent[3]));
+						this.deltaTarget=this.currentEvent[2];
+						break;
+					}
+					if(this.automation.length>0) {
+						var n=waapisimSampleRate/waapisimBufSize*(this.automation[0][0]-this.context.currentTime);
+						switch(this.automation[0][1]) {
+						case 1:
+							this.deltaAdd=(this.automation[0][2]-this.value)/n;
+							break;
+						case 2:
+							this.deltaMul=Math.pow(this.automation[0][2]/this.value,1/n);
+							break;
+						}
+					}
+				}
+			}
+		}
 		this.Get=function(n) {
 			this.computedValue=this.value+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;
 			return this.computedValue;
@@ -1135,4 +1246,3 @@ function waapisimSetup() {
 		}
 	}
 }
-waapisimSetup();

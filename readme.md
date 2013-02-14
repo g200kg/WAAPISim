@@ -18,7 +18,8 @@ WAAPISim is still not completed. It is tentative and partial implementation.
 * PannerNode : Simplified. Listener position should stay default. Source positions are interpreted as x-z 2d coordinate
 * ScriptProcessorNode : Implemented. Input buffer size should be 1024 and under (No limitation if use output only)
 * OscillatorNode : Implemented except for Custom waveform
-* ConvolverNode / ChannelSplitterNode / ChannelMergerNode : Just a dummy. Pass-through from input to output.
+* ConvolverNode : By performance reason, convolution is executed for only IR's first 1000 samples. Sebsequent part will be replaced as simple delays.
+* ChannelSplitterNode / ChannelMergerNode : Just a dummy. Pass-through from input to output.
 * createBuffer from ArrayBuffer supports only .wav format
 * k-rate AudioParam controls are executed only per 1024 samples frequency. a-rate AudioParams are controlled by sample.
 

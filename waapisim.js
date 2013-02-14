@@ -5,7 +5,7 @@
 //         http://opensource.org/licenses/MIT
 //
 //  Great thanks :
-//  FFT algo for AnalyserNode is based on Takuya OOURA's explanation.
+//  FFT algo for AnalyserNode and Convolver is based on Takuya OOURA's explanation.
 //   http://www.kurims.kyoto-u.ac.jp/~ooura/fftman/index.html
 
 var waapisimLogEnable=0;
@@ -951,11 +951,224 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.numberOfOutputs=1;
 		this.playbackState=0;
 		this.buffer=null;
-		this.normalize=false;
+		this.normalize=true;
+		this.scale=1;
+		this.analyzed=null;
+		this.dlybufsize=waapisimSampleRate*5;
+		this.dlybuf=new waapisimAudioBuffer(2,this.dlybufsize,44100);
+		this.dlyidx=0;
+		this.tapsize=20;
+		this.tap=new Array();
+		this.kernel=null;
+		this.sum=new Array();
+		this.sum[0]=new Array();
+		this.sum[1]=new Array();
+		this.bitrev=new Array();
+		this.bitrev[0]=0;
+		this.bitrev[waapisimBufSize-1]=waapisimBufSize-1;
+		for(var i=0,j=1;j<waapisimBufSize-1;++j) {
+			for(var k=waapisimBufSize>>1;k>(i^=k);k>>=1)
+				;
+			this.bitrev[j]=i;
+		}
+		for(var i=0;i<2;++i)
+			for(var j=0;j<2;++j)
+				this.sum[i][j]=new Float32Array(waapisimSampleRate);
+		this.Normalize=function(buffer) {
+			var GainCalibration=0.00125;
+			var GainCalibrationSampleRate=44100;
+			var MinPower=0.000125;
+			var numberOfChannels=2;
+			var length=buffer.length;
+			var power=0;
+			for(var i=0;i<numberOfChannels;++i) {
+				var sourceP=0;
+				var channelPower=0;
+				var n=length;
+				while(n--) {
+					var sample=buffer.buf[i][sourceP++];
+					channelPower+=sample*sample;
+				}
+				power+=channelPower;
+			}
+			power=Math.sqrt(power/(numberOfChannels*length));
+			if(isFinite(power)==false||isNaN(power)||power<MinPower)
+				power=MinPower;
+			var scale=1/power;
+			scale*=GainCalibration;
+			return scale;
+		}
+		this.Fft=function(n,a) {
+			var m,mh,mq,i,j,k,jr,ji,kr,ki;
+			var theta, wr, wi, xr, xi;
+			var i=0;
+			for(j=1;j<n-1;j++) {
+				for(k=n>>1;k>(i^=k);k>>=1)
+					;
+				if(j<i) {
+					xr=a[j];
+					a[j]=a[i];
+					a[i]=xr;
+				}
+			}
+			theta=-2*Math.PI;
+			for(mh=1;(m=mh<<1)<=n;mh=m) {
+				mq=mh>>1;
+				theta*=0.5;
+				for(jr=0;jr<n;jr+=m) {
+					kr=jr+mh;
+					xr=a[kr];
+					a[kr]=a[jr]-xr;
+					a[jr]+=xr;
+				}
+				for(i=1;i<mq;i++) {
+					wr=Math.cos(theta*i);
+					wi=Math.sin(theta*i);
+					for(j=0;j<n;j+=m) {
+						jr=j+i;
+						ji=j+mh-i;
+						kr=j+mh+i;
+						ki=j+m-i;
+						xr=wr*a[kr]+wi*a[ki];
+						xi=wr*a[ki]-wi*a[kr];
+						a[kr]=-a[ji]+xi;
+						a[ki]=a[ji]+xi;
+						a[ji]=a[jr]-xr;
+						a[jr]=a[jr]+xr;
+					}
+				}
+			}
+		}
+		this.Fft2=function(n,ar,ai) {
+			var m, mh, i, j, k;
+			var wr, wi, xr, xi;
+			var theta=2*Math.PI/n;
+			i=0;
+			for(j=1;j<n-1;j++) {
+				for(k=n>>1;k>(i^=k);k>>=1)
+					;
+				if(j<i) {
+					xr=ar[j];
+					xi=ai[j];
+					ar[j]=ar[i];
+					ai[j]=ai[i];
+					ar[i]=xr;
+					ai[i]=xi;
+				}
+			}
+			theta*=n;
+			for(mh=1;(m=mh<<1)<=n;mh=m) {
+				theta *= 0.5;
+				for(i=0;i<mh;i++) {
+					wr=Math.cos(theta*i);
+					wi=Math.sin(theta*i);
+					for(j=i;j<n;j+=m) {
+						k=j+mh;
+						xr=wr*ar[k]-wi*ai[k];
+						xi=wr*ai[k]+wi*ar[k];
+						ar[k]=ar[j]-xr;
+						ai[k]=ai[j]-xi;
+						ar[j]+=xr;
+						ai[j]+=xi;
+					}
+				}
+			}
+			for(var i=0;i<n;++i)
+				ar[i]=ar[i]/n;
+		}
 		this.Process=function() {
 			var inbuf=this.inbuf.buf;
-			for(var i=0;i<waapisimBufSize;++i) {
-				this.NodeEmit(i,inbuf[0][i],inbuf[1][i]);
+			var nh=(waapisimBufSize*0.5)|0;
+			if(this.buffer!=null) {
+				var kbuf=new Array();
+				for(var i=0;i<4;++i)
+					kbuf[i]=new waapisimAudioBuffer(2,waapisimBufSize,44100);
+				if(this.buffer!=this.analyzed) {
+					this.scale=1;
+					if(this.normalize)
+						this.scale=this.Normalize(this.buffer);
+					var len=this.buffer.length;
+					for(var i=0,px=0;i<this.tapsize;++i) {
+						var x=(i*len/this.tapsize)|0;
+						var sz=x-px;
+						var v0=0;
+						var v1=0;
+						if(sz>0) {
+							while(px<x) {
+								v0+=this.buffer.buf[0][px]*this.buffer.buf[0][px];
+								v1+=this.buffer.buf[1][px]*this.buffer.buf[1][px];
+								++px;
+							}
+							v0=Math.sqrt(v0)*this.scale*0.5;
+							v1=Math.sqrt(v1)*this.scale*0.5;
+						}
+						this.tap[i]=[x,v0,v1];
+					}
+					this.kernel=new waapisimAudioBuffer(2,waapisimBufSize,44100);
+					var p=0,maxp=0;
+					for(var l=Math.min(this.buffer.length,waapisimBufSize*4),i=0,j=0,k=0;i<l;++i) {
+						var v0=this.buffer.buf[0][i];
+						var v1=this.buffer.buf[1][i];
+						kbuf[k].buf[0][j]=v0;
+						kbuf[k].buf[1][j]=v1;
+						p+=(v0*v0+v1*v1);
+						if(++j>=waapisimBufSize) {
+							if(p>maxp) {
+								this.kernel=kbuf[k];
+								maxp=p;
+							}
+							j=0;
+							p=0;
+							++k;
+						}
+					}
+					if(p>maxp||this.kernel==null)
+						this.kernel=kbuf[k];
+					this.Fft(waapisimBufSize,this.kernel.buf[0]);
+					this.Fft(waapisimBufSize,this.kernel.buf[1]);
+					this.analyzed=this.buffer;
+				}
+				
+				this.Fft(waapisimBufSize,inbuf[0]);
+				this.Fft(waapisimBufSize,inbuf[1]);
+				this.sum[0][0][0]=0;//inbuf[0][0]*this.kernel.buf[0][0];
+				this.sum[1][0][0]=0;//inbuf[1][0]*this.kernel.buf[1][0];
+				this.sum[0][1][0]=this.sum[1][1][0]=0;
+				for(var i=1,j=waapisimBufSize-1;i<nh;++i,--j) {
+					var real0=inbuf[0][i]*this.kernel.buf[0][i]-inbuf[0][j]*this.kernel.buf[0][j];
+					var imag0=inbuf[0][i]*this.kernel.buf[0][j]+inbuf[0][j]*this.kernel.buf[0][i];
+					this.sum[0][0][i]=real0;
+					this.sum[0][0][j]=real0;
+					this.sum[0][1][i]=-imag0;
+					this.sum[0][1][j]=imag0;
+					var real1=inbuf[1][i]*this.kernel.buf[1][i]-inbuf[1][j]*this.kernel.buf[1][j];
+					var imag1=inbuf[1][i]*this.kernel.buf[1][j]+inbuf[1][j]*this.kernel.buf[1][i];
+					this.sum[1][0][i]=real1;
+					this.sum[1][0][j]=real1;
+					this.sum[1][1][i]=-imag1;
+					this.sum[1][1][j]=imag1;
+				}
+
+				this.Fft2(waapisimBufSize,this.sum[0][0],this.sum[0][1]);
+				this.Fft2(waapisimBufSize,this.sum[1][0],this.sum[1][1]);
+
+				for(var i=0;i<waapisimBufSize;++i) {
+					var v=(nh-Math.abs(i-nh))/nh;
+					this.dlybuf.buf[0][this.dlyidx]=this.sum[0][0][i]*v;
+					this.dlybuf.buf[1][this.dlyidx]=this.sum[1][0][i]*v;
+					var v0=0,v1=0;
+					for(var l=this.tap.length,j=0;j<l;++j) {
+						var idx=this.dlyidx-this.tap[j][0];
+						if(idx<0)
+							idx+=this.dlybufsize;
+						v0+=this.dlybuf.buf[0][idx]*this.tap[j][1];
+						v1+=this.dlybuf.buf[1][idx]*this.tap[j][2];
+					}
+					this.NodeEmit(i,v0,v1);
+					if(++this.dlyidx>=this.dlybufsize)
+						this.dlyidx=0;
+				}
+
 			}
 			this.NodeClear();
 		}

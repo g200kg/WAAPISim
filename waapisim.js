@@ -13,6 +13,8 @@ var waapisimLogEnable=0;
 // Support Float32Array if unavailable (for IE9)
 if(typeof(Float32Array)==="undefined") {
 	Float32Array=function(n) {
+		if(n instanceof Array)
+			return n;
 		var a=new Array(n);
 		a.subarray=function(x,y) {return this.slice(x,y);}
 		a.set=function(x,off) {for(var i=0;i<x.length;++i) a[off+i]=x[i];}
@@ -21,6 +23,8 @@ if(typeof(Float32Array)==="undefined") {
 }
 if(typeof(Uint8Array)==="undefined") {
 	Uint8Array=function(n) {
+		if(n instanceof Array)
+			return n;
 		var a=new Array(n);
 		a.subarray=function(x,y) {return this.slice(x,y);}
 		a.set=function(x,off) {for(var i=0;i<x.length;++i) a[off+i]=x[i];}
@@ -59,69 +63,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 	waapisimNodes=new Array();
 	waapisimContexts=new Array();
 	waapisimAudioBuffer=function(ch,len,rate) {
-		if(typeof(ch)!=="number") {
-			this.sampleRate=44100;
-			var buf=new Uint8Array(ch);
-			riff=String.fromCharCode(buf[0],buf[1],buf[2],buf[3]);
-			if(riff=="RIFF") {
-				var filesize=buf[4]+(buf[5]<<8)+(buf[6]<<16)+(buf[7]<<24)+8;
-				var wave=String.fromCharCode(buf[8],buf[9],buf[10],buf[11]);
-				if(wave=="WAVE") {
-					var idx=12;
-					while(idx<filesize) {
-						var chunk=String.fromCharCode(buf[idx],buf[idx+1],buf[idx+2],buf[idx+3]);
-						var chunksz=buf[idx+4]+(buf[idx+5]<<8)+(buf[idx+6]<<16)+(buf[idx+7]<<24);
-						if(chunk=="fmt ") {
-							var fmtid=buf[idx+8]+(buf[idx+9]<<8);
-							var wavch=buf[idx+10]+(buf[idx+11]<<8);
-							var wavrate=buf[idx+12]+(buf[idx+13]<<8)+(buf[idx+14]<<16)+(buf[idx+15]<<24);
-							var wavbits=buf[idx+22]+(buf[idx+23]<<8);
-						}
-						if(chunk=="data") {
-							this.length=(chunksz/wavch/(wavbits/8))|0;
-							this.buf=new Array();
-							this.buf[0]=new Float32Array(this.length);
-							this.buf[1]=new Float32Array(this.length);
-							this.numberOfChannels=2;
-							this.duration=this.length/44100;
-							var v;
-							for(var i=0,j=0;i<this.length;++i) {
-								if(wavbits==16) {
-									if(wavch==2) {
-										v=buf[idx+j+8]+(buf[idx+j+9]<<8);
-										if(v>=32768) v=v-65536;
-										this.buf[0][i]=v/32768;
-										v=buf[idx+j+8]+(buf[idx+j+9]<<8);
-										if(v>=32768) v=v-65536;
-										this.buf[1][i]=v/32768;
-										j+=4;
-									}
-									else {
-										v=buf[idx+j+8]+(buf[idx+j+9]<<8);
-										if(v>=32768) v=v-65536;
-										this.buf[0][i]=this.buf[1][i]=v/32768;
-										j+=2;
-									}
-								}
-								else {
-									if(wavch==2) {
-										this.buf[0][i]=buf[idx+j+8]/128-1;
-										this.buf[1][i]=buf[idx+j+9]/128-1;
-										j+=2;
-									}
-									else {
-										this.buf[0][i]=this.buf[1][i]=buf[idx+j+8]/128-1;
-										j++;
-									}
-								}
-							}
-						}
-						idx+=(chunksz+8);
-					}
-				}
-			}
-		}
-		else {
+		if(typeof(ch)=="number") {
 			this.sampleRate=rate;
 			this.length=len;
 			this.duration=len/this.sampleRate;
@@ -131,6 +73,80 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				this.buf[i]=new Float32Array(len);
 				for(var j=0;j<len;++j)
 					this.buf[i][j]=0;
+			}
+		}
+		else {
+			var inbuf;
+			this.sampleRate=44100;
+			this.buf=new Array();
+			this.buf[0]=new Float32Array(0);
+			this.buf[1]=new Float32Array(0);
+			this.Get4BStr=function(b,n) {
+				return String.fromCharCode(b[n],b[n+1],b[n+2],b[n+3]);
+			}
+			this.GetDw=function(b,n) {
+				return b[n]+(b[n+1]<<8)+(b[n+2]<<16)+(b[n+3]<<24);
+			}
+			this.GetWd=function(b,n) {
+				return b[n]+(b[n+1]<<8);
+			}
+			inbuf=new Uint8Array(ch);
+			var riff=this.Get4BStr(inbuf,0);
+			if(riff=="RIFF") {
+				var filesize=this.GetDw(inbuf,4)+8;
+				var wave=this.Get4BStr(inbuf,8);
+				if(wave=="WAVE") {
+					var idx=12;
+					while(idx<filesize) {
+						var chunk=this.Get4BStr(inbuf,idx);
+						var chunksz=this.GetDw(inbuf,idx+4);
+						if(chunk=="fmt ") {
+							var fmtid=this.GetWd(inbuf,idx+8);
+							var wavch=this.GetWd(inbuf,idx+10);
+							this.sampleRate=this.GetDw(inbuf,idx+12);
+							var wavbits=this.GetWd(inbuf,idx+22);
+						}
+						if(chunk=="data") {
+							this.length=(chunksz/wavch/(wavbits/8))|0;
+							this.buf[0]=new Float32Array(this.length);
+							this.buf[1]=new Float32Array(this.length);
+							this.numberOfChannels=2;
+							this.duration=this.length/44100;
+							var v;
+							for(var i=0,j=0;i<this.length;++i) {
+								if(wavbits==16) {
+									if(wavch==2) {
+										v=inbuf[idx+j+8]+(inbuf[idx+j+9]<<8);
+										if(v>=32768) v=v-65536;
+										this.buf[0][i]=v/32768;
+										v=inbuf[idx+j+10]+(inbuf[idx+j+11]<<8);
+										if(v>=32768) v=v-65536;
+										this.buf[1][i]=v/32768;
+										j+=4;
+									}
+									else {
+										v=inbuf[idx+j+8]+(inbuf[idx+j+9]<<8);
+										if(v>=32768) v=v-65536;
+										this.buf[0][i]=this.buf[1][i]=v/32768;
+										j+=2;
+									}
+								}
+								else {
+									if(wavch==2) {
+										this.buf[0][i]=inbuf[idx+j+8]/128-1;
+										this.buf[1][i]=inbuf[idx+j+9]/128-1;
+										j+=2;
+									}
+									else {
+										this.buf[0][i]=this.buf[1][i]=inbuf[idx+j+8]/128-1;
+										j++;
+									}
+								}
+							}
+						}
+						idx+=(chunksz+8);
+					}
+				}
 			}
 		}
 		this.getChannelData=function(i) {
@@ -316,14 +332,14 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		for(var i=0;i<8192;++i)
 			this.table[i]=0;
 	}
-	waapisimAudioNode=function(size) {
+	waapisimAudioNode=function(size,numin,numout) {
 		this.nodeId=waapisimNodeId++;
 		this.targettype=1;
 		this.context=null;
 		this.bufsize=size;
 		this.from=new Array();
 		this.to=new Array();
-		this.connect=function(next) {
+		this.connect=function(next,output,input) {
 			waapisimDebug("connect "+this.nodetype+this.nodeId+"=>"+next.nodetype+next.nodeId);
 			if(next.from.indexOf(this)!=-1)
 				return;
@@ -466,6 +482,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				return;
 			var b0=this.buffer.getChannelData(0);
 			var b1=this.buffer.getChannelData(1);
+			var rate=44100/this.buffer.sampleRate;
 			if(this.to.length>0) {
 				for(var i=0;i<waapisimBufSize;++i) {
 					if(this.bufferindex<this.endindex) {
@@ -473,14 +490,14 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 						this.outbuf.buf[0][i]=b0[idx];
 						this.outbuf.buf[1][i]=b1[idx];
 					}
-					this.bufferindex+=this.playbackRate.Get(i);
+					this.bufferindex+=rate*this.playbackRate.Get(i);
 					if(this.loop) {
 						if(this.bufferindex>=this.actualLoopEnd)
 							this.bufferindex=this.actualLoopStart;
 					}
 				}
 				this.NodeEmitBuf();
-				this.playbackRate.Clear(false);
+				this.playbackRate.Clear(true);
 			}
 		}
 	}
@@ -709,7 +726,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					this.NodeEmit(i,inbuf[0][i]*this.gain.Get(i),inbuf[1][i]*this.gain.Get(i));
 			}
 			this.NodeClear();
-			this.gain.Clear(false);
+			this.gain.Clear(true);
 		}
 	}
 
@@ -1300,7 +1317,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		waapisimDebug("create "+this.nodetype+this.nodeId);
 		this.context=ctx;
 		this.numberOfInputs=1;
-		this.numberOfOutputs=1;
+		this.numberOfOutputs=2;
 		this.playbackState=0;
 		this.Process=function() {
 			var inbuf=this.inbuf.buf;

@@ -530,7 +530,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				}
 				else {
 					this.actualLoopStart=0;
-					this.actualLoopEnd=buffer.length;
+					this.actualLoopEnd=this.buffer.length;
 				}
 			}
 			waapisimRegisterNode(this);

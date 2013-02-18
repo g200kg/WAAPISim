@@ -125,7 +125,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 										v1=inbuf[idx+j+10]+(inbuf[idx+j+11]<<8);
 										if(v0>=32768) v0=v0-65536;
 										if(v1>=32768) v1=v1-65536;
-										if(mixtomono==true)
+										if(mixtomono===true)
 											v0=v1=(v0+v1)*0.5;
 										this.buf[0][i]=v0/32768;
 										this.buf[1][i]=v1/32768;
@@ -142,7 +142,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 									if(wavch==2) {
 										v0=inbuf[idx+j+8]/128-1;
 										v1=inbuf[idx+j+9]/128-1;
-										if(mixtomono==true)
+										if(mixtomono===true)
 											v0=v1=(v0+v1)*0.5;
 										this.buf[0][i]=v0;
 										this.buf[1][i]=v1;
@@ -166,16 +166,19 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 	};
 	waapisimDummybuf=new waapisimAudioBuffer(2,waapisimBufSize,waapisimSampleRate);
 	waapisimRegisterNode=function(node) {
-		for(var i=waapisimNodes.length;i--;)
-			if(waapisimNodes[i]===node)
+		for(var i=waapisimNodes.length;i--;) {
+			if(waapisimNodes[i]===node) {
 				return false;
+			}
+		}
 		waapisimNodes.push(node);
 		return true;
 	};
 	waapisimUnregisterNode=function(node) {
 		for(var i=waapisimNodes.length;i--;) {
-			if(waapisimNodes[i]==node)
+			if(waapisimNodes[i]==node) {
 				waapisimNodes.splice(i,1);
+			}
 		}
 	};
 	waapisimSetupOutBuf=function(offset) {
@@ -243,11 +246,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		div.setAttribute("style","background:#ff00ff;positoin:static;");
 		var body=document.getElementsByTagName("BODY");
 		body[0].appendChild(div);
-		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<div style='position:fixed;right:0px;bottom:0px'> <object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=150 height=20>"
-		+"<param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'>"
-		+"<embed src='"+waapisimSwfPath+"' width=150 height=20 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed>"
-		+"</object></div>";
-	}
+		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<div style='position:fixed;right:0px;bottom:0px'> <object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=150 height=20><param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'><embed src='"+waapisimSwfPath+"' width=150 height=20 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed></object></div>";
+	};
 	waapisimFlashOffset=function(pos) {
 		waapisimUpdateCurrentTime(pos/1000);
 	};
@@ -325,6 +325,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			return new waapisimWaveShaper(this);
 		};
 		this.decodeAudioData=function(audioData,successCallback,errorCallback) {
+			var buf=new waapisimAudioBuffer(audioData,false);
+			successCallback(buf);
 		};
 		this.createWaveTable=function(real,imag) {
 			return new waapisimWaveTable(real,imag);
@@ -348,7 +350,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 	waapisimAudioNode=function(size,numin,numout) {
 		this.numberOfInputs=numin;
 		this.numberOfOutputs=numout;
-		this.nodeId=waapisimNodeId++;
+		this.nodeId=waapisimNodeId;
+		++waapisimNodeId;
 		this.targettype=1;
 		this.context=null;
 		this.bufsize=size;
@@ -784,6 +787,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			default:
 				for(i=0;i<waapisimBufSize;++i)
 					this.nodeout[0].NodeEmit(i,inbuf[0][i]*this.gain.Get(i),inbuf[1][i]*this.gain.Get(i));
+				break;
 			}
 			this.nodein[0].NodeClear();
 			this.gain.Clear(true);
@@ -1405,11 +1409,12 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.context=ctx;
 		this.playbackState=0;
 		this.curve=null;
+		var i;
 		this.Process=function() {
 			var inbuf=this.nodein[0].inbuf.buf;
 			if(this.curve!==null) {
 				var len=this.curve.length-1;
-				for(var i=0;i<waapisimBufSize;++i) {
+				for(i=0;i<waapisimBufSize;++i) {
 					var xl=Math.max(-1,Math.min(1,inbuf[0][i]));
 					var xr=Math.max(-1,Math.min(1,inbuf[1][i]));
 					xl=this.curve[((xl+1)*0.5*len+0.5)|0];
@@ -1418,7 +1423,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				}
 			}
 			else {
-				for(var i=0;i<waapisimBufSize;++i)
+				for(i=0;i<waapisimBufSize;++i)
 					this.nodeout[0].NodeEmit(i,inbuf[0][i],inbuf[1][i]);
 			}
 			this.nodein[0].NodeClear();

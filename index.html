@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Waapisim : Web Audio API Simulator for Firefox/MSIE/Opera" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Waapisim</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/g200kg/WAAPISim">View on GitHub</a>
+
+          <h1 id="project_title">Waapisim</h1>
+          <h2 id="project_tagline">Web Audio API Simulator for Firefox/MSIE/Opera</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/g200kg/WAAPISim/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/g200kg/WAAPISim/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>WAAPISim : Web Audio API Simulator</h1>
+
+<p>WAAPISim is a browser's 'Web Audio API' polyfill fallbacking to Firefox's 'Audio Data API' or Flash for MSIE/Opera.</p>
+
+<p>WAAPISim automatically check the availability of APIs:<br>
+WebAudioAPI =&gt; AudioDataAPI =&gt; Flash</p>
+
+<p><strong><a href="http://www.g200kg.com/docs/waapisim/">http://www.g200kg.com/docs/waapisim/</a></strong></p>
+
+<h2>Current Status</h2>
+
+<p>WAAPISim is still not completed. It is tentative and partial implementation.</p>
+
+<ul>
+<li>Number of channels in each nodes should be 1 (mono) or 2(stereo)</li>
+<li>OscillatorNode / ChannelSplitterNode / ChannelMergerNode / AudioBufferSourceNode / WaveShaperNode / AnalyserNode / GainNode / BiquadFilterNode / DelayNode : implemented</li>
+<li>DynamicsCompressorNode : Implemented but has a little different characteristics from Chrome's implements.</li>
+<li>PannerNode : Simplified. Listener position should stay default. Source positions are interpreted as x-z 2d coordinate</li>
+<li>ScriptProcessorNode : Implemented. Input buffer size should be 1024 and under (No limitation if use output only)</li>
+<li>ConvolverNode : By performance reason, convolution is executed for only IR's first 1000 samples. Sebsequent part will be replaced as simple delays.</li>
+<li>createBuffer from ArrayBuffer supports only .wav format</li>
+<li>k-rate AudioParam controls are executed only per 1024 samples frequency. a-rate AudioParams are controlled by sample.</li>
+</ul><h2>Usage</h2>
+
+<p>Load the 'waapisim.js' before using the Web Audio API functions in your script.</p>
+
+<p><code>&lt;script type="text/javascript" src="waapisim.js"&gt;&lt;/script&gt;</code></p>
+
+<p>To enable fallbacking to Flash, place the 'waapisim.swf' file to same folder as 'waapisim.js'.</p>
+
+<h2>License</h2>
+
+<p>Copyright (c) 2013 g200kg<br><a href="http://www.g200kg.com/">http://www.g200kg.com/</a><br>
+Released under the MIT License</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Waapisim maintained by <a href="https://github.com/g200kg">g200kg</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>

@@ -12,11 +12,11 @@ WebAudioAPI => AudioDataAPI => Flash
 
 ## Some Links of Test-pages
 
-[Node test (Oscillator/ScriptProcessor/BiquadFilter/WaveShaper/Panner/Analyser)](http://www.g200kg.com/docs/waapisim/nodetest.html)
-[Compressor test](http://www.g200kg.com/docs/waapisim/comptest.html)
-[AudioParam Automation test](http://www.g200kg.com/docs/waapisim/automationtest.html)
-[ChannelSplitter/ChannelMerger test](http://www.g200kg.com/docs/waapisim/test-split.html)
-
+[Node test (Oscillator/ScriptProcessor/BiquadFilter/WaveShaper/Panner/Analyser)](http://www.g200kg.com/docs/waapisim/nodetest.html)  
+[Compressor test](http://www.g200kg.com/docs/waapisim/comptest.html)  
+[AudioParam Automation test](http://www.g200kg.com/docs/waapisim/automationtest.html)  
+[ChannelSplitter/ChannelMerger test](http://www.g200kg.com/docs/waapisim/test-split.html)  
+[Oscillator custom waveform test](http://www.g200kg.com/jp/docs/webaudio/samples/test-osccustom.html)  
 
 ## Current Status
 

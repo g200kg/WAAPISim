@@ -8,8 +8,6 @@ WebAudioAPI => AudioDataAPI => Flash
 **<http://www.g200kg.com/docs/waapisim/>**
 
 
-WebAudioSynth running on MSIE
-[[youtube-AHR2C2C2v8E-688x387]]
 
 ## Current Status
 

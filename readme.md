@@ -9,7 +9,7 @@ WebAudioAPI => AudioDataAPI => Flash
 
 
 WebAudioSynth running on MSIE
-[[youtube-AHR2C2C2v8E-cGAQ-688x387]]
+[[youtube-AHR2C2C2v8E-688x387]]
 
 ## Current Status
 

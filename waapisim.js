@@ -38,6 +38,68 @@ if(typeof(waapisimLogEnable)!=="undefined"&&waapisimLogEnable)
 else
 	waapisimDebug=function(){};
 
+if(typeof(webkitAudioContext)!=="undefined") {
+	if(typeof(webkitAudioContext.prototype.createGain)==="undefined") {
+		webkitAudioContext.prototype.createScriptProcessor=webkitAudioContext.prototype.createJavaScriptNode;
+		webkitAudioContext.prototype.createGain=(function(){
+			var o=webkitAudioContext.prototype.createGainNode.call(this);
+			o._gain=o.gain; o.gain=o._gain;
+			o.gain.setTargetAtTime=o._gain.setTargetValueAtTime;
+			return o;
+		});
+		webkitAudioContext.prototype.createDelay=(function(){
+			var o=webkitAudioContext.prototype.createDelayNode.call(this);
+			o._delayTime=o.delayTime; o.delayTime=o._delayTime;
+			o.delayTime.setTargetAtTime=o._delayTime.setTargetValueAtTime;
+			return o;
+		});
+		webkitAudioContext.prototype._createOscillator=webkitAudioContext.prototype.createOscillator;
+		webkitAudioContext.prototype.createOscillator=(function() {
+			var o=webkitAudioContext.prototype._createOscillator.call(this);
+			o._frequency=o.frequency; o.frequency=o._frequency;
+			o.frequency.setTargetAtTime=o._frequency.setTargetValueAtTime;
+			o._detune=o.detune; o.detune=o._detune;
+			o.detune.setTargetAtTime=o._detune.setTargetValueAtTime;
+			o.start=o.noteOn;
+			o.stop=o.noteOff;
+			return o;
+		});
+		webkitAudioContext.prototype._createBufferSource=webkitAudioContext.prototype.createBufferSource;
+		webkitAudioContext.prototype.createBufferSource=(function() {
+			var o=webkitAudioContext.prototype._createBufferSource.call(this);
+			o._playbackRate=o.playbackRate; o.playbackRate=o._playbackRate;
+			o.playbackRate.setTargetAtTime=o._playbackRate.setTargetValueAtTime;
+			o.start=o.noteOn;
+			o.stop=o.noteOff;
+			return o;
+		});
+		webkitAudioContext.prototype._createBiquadFilter=webkitAudioContext.prototype.createBiquadFilter;
+		webkitAudioContext.prototype.createBiquadFilter=(function() {
+			var o=webkitAudioContext.prototype._createBiquadFilter.call(this);
+			o._frequency=o.frequency; o.frequency=o._frequency;
+			o.frequency.setTargetAtTime=o._frequency.setTargetValueAtTime;
+			o._Q=o.Q; o.Q=o._Q;
+			o.Q.setTargetAtTime=o._Q.setTargetValueAtTime;
+			o._gain=o.gain; o.gain=o._gain;
+			o.gain.setTargetAtTime=o._gain.setTargetValueAtTime;
+			return o;
+		});
+		webkitAudioContext.prototype._createDynamicsCompressor=webkitAudioContext.prototype.createDynamicsCompressor;
+		webkitAudioContext.prototype.createDynamicsCompressor=(function() {
+			var o=webkitAudioContext.prototype._createDynamicsCompressor.call(this);
+			o._threshold=o.threshold; o.threshold=o._threshold;
+			o.threshold.setTargetAtTime=o._threshold.setTargetValueAtTime;
+			o._knee=o.knee; o.knee=o._knee;
+			o.knee.setTargetAtTime=o._knee.setTargetValueAtTime;
+			o._ratio=o.ratio; o.ratio=o._ratio;
+			o.ratio.setTargetAtTime=o._ratio.setTargetValueAtTime;
+			o._attack=o.attack; o.attack=o._attack;
+			o.attack.setTargetAtTime=o._attack.setTargetValueAtTime;
+			return o;
+		});
+	}
+}
+
 if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined") {
 	waapisimSampleRate=44100;
 	waapisimAudioIf=0;
@@ -177,7 +239,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					node=ctx._Nodes[i];
 					if(node.playbackState==3) {
 						node.disconnect();
-						ctx.UnregisterNode(node);
+						ctx._UnregisterNode(node);
 						break;
 					}
 				}
@@ -315,7 +377,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.createWaveTable=function(real,imag) {
 			return new waapisimWaveTable(real,imag);
 		};
-		this.RegisterNode=function(node) {
+		this._RegisterNode=function(node) {
 			for(var i=this._Nodes.length;i--;) {
 				if(this._Nodes[i]===node) {
 					return false;
@@ -324,7 +386,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this._Nodes.push(node);
 			return true;
 		};
-		this.UnregisterNode=function(node) {
+		this._UnregisterNode=function(node) {
 			for(var i=this._Nodes.length;i--;) {
 				if(this._Nodes[i]==node) {
 					this._Nodes.splice(i,1);
@@ -442,7 +504,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			if(this.to.indexOf(next)==-1)
 				this.to.push(next);
 			if(next.node._targettype!==0) {
-				if(this.node.context.RegisterNode(next.node)) {
+				if(this.node.context._RegisterNode(next.node)) {
 					for(var i=0;i<next.node._nodeout.length;++i) {
 						for(var ii=0;ii<next.node._nodeout[i].to.length;++ii) {
 							next.node._nodeout[i].connect(next.node._nodeout[i].to[ii]);
@@ -471,7 +533,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					for(ii=0;ii<node._nodein.length;++ii)
 						n+=node._nodein[ii].from.length;
 					if(n===0) {
-						this.node.context.UnregisterNode(node);
+						this.node.context._UnregisterNode(node);
 						for(ii=0;ii<node._nodeout.length;++ii)
 							node._nodeout[ii].disconnectTemp();
 						break;
@@ -529,47 +591,47 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.loop=false;
 		this.loopStart=0;
 		this.loopEnd=0;
-		this.bufferindex=0;
-		this.whenstart=0;
-		this.whenstop=Number.MAX_VALUE;
-		this.endindex=0;
-		this.actualLoopStart=0;
-		this.actualLoopEnd=0;
+		this._bufferindex=0;
+		this._whenstart=0;
+		this._whenstop=Number.MAX_VALUE;
+		this._endindex=0;
+		this._actualLoopStart=0;
+		this._actualLoopEnd=0;
 		this.start=this.noteOn=this.noteGrainOn=function(w,off,dur) {
 			this.playbackState=1;
-			this.whenstart=w;
+			this._whenstart=w;
 			if(off>0)
-				this.bufferindex=off*waapisimSampleRate;
-			this.endindex=this.buffer.length;
+				this._bufferindex=off*waapisimSampleRate;
+			this._endindex=this.buffer.length;
 			if(dur>0)
-				this.endindex=Math.min(this.buffer.length,(dur+off)*waapisimSampleRate);
+				this._endindex=Math.min(this.buffer.length,(dur+off)*waapisimSampleRate);
 			if(this.loop) {
 				if((this.loopStart||this.loopEnd)&&this.loopStart>=0&&this.loopEnd>0&&this.loopStart<this.loopEnd) {
-					this.actualLoopStart=this.loopStart;
-					this.actualLoopEnd=Math.min(this.loopEnd,this.buffer.length);
+					this._actualLoopStart=this.loopStart;
+					this._actualLoopEnd=Math.min(this.loopEnd,this.buffer.length);
 				}
 				else {
-					this.actualLoopStart=0;
-					this.actualLoopEnd=this.buffer.length;
+					this._actualLoopStart=0;
+					this._actualLoopEnd=this.buffer.length;
 				}
 			}
-			this.context.RegisterNode(this);
+			this.context._RegisterNode(this);
 		};
 		this.stop=this.noteOff=function(w) {
-			this.whenstop=w;
+			this._whenstop=w;
 		};
 		this._Process=function() {
 			this.playbackRate._Process();
-			if(this.buffer!==null && this.bufferindex>=this.endindex) {
+			if(this.buffer!==null && this._bufferindex>=this._endindex) {
 				if(this.playbackState==2)
 					--this.context.activeSourceCount;
 				this.playbackState=3;
 			}
-			if(this.playbackState==1 && this.context.currentTime>=this.whenstart) {
+			if(this.playbackState==1 && this.context.currentTime>=this._whenstart) {
 				this.playbackState=2;
 				++this.context.activeSourceCount;
 			}
-			if(this.playbackState==2 && this.context.currentTime>=this.whenstop) {
+			if(this.playbackState==2 && this.context.currentTime>=this._whenstop) {
 				this.playbackState=3;
 				--this.context.activeSourceCount;
 			}
@@ -580,15 +642,15 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			var rate=44100/this.buffer.sampleRate;
 			if(this._nodeout[0].to.length>0) {
 				for(var i=0;i<waapisimBufSize;++i) {
-					if(this.bufferindex<this.endindex) {
-						var idx=this.bufferindex|0;
+					if(this._bufferindex<this._endindex) {
+						var idx=this._bufferindex|0;
 						this._nodeout[0].outbuf.buf[0][i]=b0[idx];
 						this._nodeout[0].outbuf.buf[1][i]=b1[idx];
 					}
-					this.bufferindex+=rate*this.playbackRate.Get(i);
+					this._bufferindex+=rate*this.playbackRate.Get(i);
 					if(this.loop) {
-						if(this.bufferindex>=this.actualLoopEnd)
-							this.bufferindex=this.actualLoopStart;
+						if(this._bufferindex>=this._actualLoopEnd)
+							this._bufferindex=this._actualLoopStart;
 					}
 				}
 				this._nodeout[0].NodeEmitBuf();
@@ -613,37 +675,37 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		if(typeof(outch)==="undefined")
 			outch=2;
 		this.bufferSize=bufsize;
-		this.scrinbuf=new waapisimAudioBuffer(inch,bufsize,waapisimSampleRate);
-		this.scroutbuf=new waapisimAudioBuffer(outch,bufsize,waapisimSampleRate);
-		this.index=bufsize;
+		this._scrinbuf=new waapisimAudioBuffer(inch,bufsize,waapisimSampleRate);
+		this._scroutbuf=new waapisimAudioBuffer(outch,bufsize,waapisimSampleRate);
+		this._index=bufsize;
 		this.onaudioprocess=null;
 		this._Process=function() {
 			var inb=this._nodein[0].inbuf;
 			if(inb===null)
 				inb=waapisimDummybuf;
 			for(var i=0;i<waapisimBufSize;++i) {
-				if(this.index>=this.bufferSize) {
+				if(this._index>=this.bufferSize) {
 					if(this.onaudioprocess) {
 						var ev=new waapisimAudioProcessingEvent();
 						ev.node=this;
-						ev.inputBuffer=this.scrinbuf;
-						ev.outputBuffer=this.scroutbuf;
+						ev.inputBuffer=this._scrinbuf;
+						ev.outputBuffer=this._scroutbuf;
 						this.onaudioprocess(ev);
 					}
-					this.index=0;
+					this._index=0;
 				}
-				this.scrinbuf.buf[0][this.index]=inb.buf[0][i];
-				if(this.scrinbuf.numberOfChannels>=2)
-					this.scrinbuf.buf[1][this.index]=inb.buf[1][i];
-				if(this.scroutbuf.numberOfChannels>=2)
-					this._nodeout[0].NodeEmit(i,this.scroutbuf.buf[0][this.index],this.scroutbuf.buf[1][this.index]);
+				this._scrinbuf.buf[0][this._index]=inb.buf[0][i];
+				if(this._scrinbuf.numberOfChannels>=2)
+					this._scrinbuf.buf[1][this._index]=inb.buf[1][i];
+				if(this._scroutbuf.numberOfChannels>=2)
+					this._nodeout[0].NodeEmit(i,this._scroutbuf.buf[0][this._index],this._scroutbuf.buf[1][this._index]);
 				else
-					this._nodeout[0].NodeEmit(i,this.scroutbuf.buf[0][this.index],this.scroutbuf.buf[0][this.index]);
-				this.index++;
+					this._nodeout[0].NodeEmit(i,this._scroutbuf.buf[0][this._index],this._scroutbuf.buf[0][this._index]);
+				this._index++;
 			}
 			this._nodein[0].NodeClear();
 		};
-		ctx.RegisterNode(this);
+		ctx._RegisterNode(this);
 	};
 	waapisimBiquadFilter=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,1,1);
@@ -656,91 +718,99 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.detune=new waapisimAudioParam(ctx,this,-1200,1200,0);
 		this.Q=new waapisimAudioParam(ctx,this,0.0001,1000,1);
 		this.gain=new waapisimAudioParam(ctx,this,-40,40,0);
-		this.a1=this.a2=0;
-		this.b0=this.b1=this.b2=0;
-		this.x1l=this.x1r=this.x2l=this.x2r=0;
-		this.y1l=this.y1r=this.y2l=this.y2r=0;
+		this._a1=this._a2=0;
+		this._b0=this._b1=this._b2=0;
+		this._x1l=this._x1r=this._x2l=this._x2r=0;
+		this._y1l=this._y1r=this._y2l=this._y2r=0;
 		this._nodein[0].NodeClear();
-		this.Setup=function(fil) {
+		this._Setup=function(fil) {
 			var f=fil.frequency.Get(0)*Math.pow(2,fil.detune.Get(0)/1200);
 			var q=Math.max(0.001,fil.Q.Get(0));
 			var alpha,ra0,g;
 			var w0=2*Math.PI*f/fil.context.sampleRate;
 			var cos=Math.cos(w0);
 			switch(fil.type) {
+			case "lowpass":
 			case 0:
 				q=Math.pow(10,q/20);
 				alpha=Math.sin(w0)/(2*q);
 				ra0=1/(1+alpha);
-				fil.a1=-2*cos*ra0;
-				fil.a2=(1-alpha)*ra0;
-				fil.b0=fil.b2=(1-cos)/2*ra0;
-				fil.b1=(1-cos)*ra0;
+				fil._a1=-2*cos*ra0;
+				fil._a2=(1-alpha)*ra0;
+				fil._b0=fil._b2=(1-cos)/2*ra0;
+				fil._b1=(1-cos)*ra0;
 				break;
+			case "highpass":
 			case 1:
 				q=Math.pow(10,q/20);
 				alpha=Math.sin(w0)/(2*q);
 				ra0=1/(1+alpha);
-				fil.a1=-2*cos*ra0;
-				fil.a2=(1-alpha)*ra0;
-				fil.b0=fil.b2=(1+cos)/2*ra0;
-				fil.b1=-(1+cos)*ra0;
+				fil._a1=-2*cos*ra0;
+				fil._a2=(1-alpha)*ra0;
+				fil._b0=fil._b2=(1+cos)/2*ra0;
+				fil._b1=-(1+cos)*ra0;
 				break;
+			case "bandpass":
 			case 2:
 				alpha=Math.sin(w0)/(2*q);
 				ra0=1/(1+alpha);
-				fil.a1=-2*cos*ra0;
-				fil.a2=(1-alpha)*ra0;
-				fil.b0=alpha;
-				fil.b1=0;
-				fil.b2=-alpha;
+				fil._a1=-2*cos*ra0;
+				fil._a2=(1-alpha)*ra0;
+				fil._b0=alpha;
+				fil._b1=0;
+				fil._b2=-alpha;
 				break;
+			case "lowshelf":
 			case 3:
 				alpha=Math.sin(w0)/2*Math.sqrt(2);
 				g=Math.pow(10,fil.gain.Get(0)/40);
 				ra0=1/((g+1)+(g-1)*cos+2*Math.sqrt(g)*alpha);
-				fil.a1=-2*((g-1)+(g+1)*cos)*ra0;
-				fil.a2=((g+1)+(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
-				fil.b0=g*((g+1)-(g-1)*cos+2*Math.sqrt(g)*alpha)*ra0;
-				fil.b1=2*g*((g-1)-(g+1)*cos)*ra0;
-				fil.b2=g*((g+1)-(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
+				fil._a1=-2*((g-1)+(g+1)*cos)*ra0;
+				fil._a2=((g+1)+(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
+				fil._b0=g*((g+1)-(g-1)*cos+2*Math.sqrt(g)*alpha)*ra0;
+				fil._b1=2*g*((g-1)-(g+1)*cos)*ra0;
+				fil._b2=g*((g+1)-(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
 				break;
+			case "highshelf":
 			case 4:
 				alpha=Math.sin(w0)/2*Math.sqrt(2);
 				g=Math.pow(10,fil.gain.Get(0)/40);
 				ra0=1/((g+1)-(g-1)*cos+2*Math.sqrt(g)*alpha);
-				fil.a1=2*((g-1)-(g+1)*cos)*ra0;
-				fil.a2=((g+1)-(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
-				fil.b0=g*((g+1)+(g-1)*cos+2*Math.sqrt(g)*alpha)*ra0;
-				fil.b1=-2*g*((g-1)+(g+1)*cos)*ra0;
-				fil.b2=g*((g+1)+(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
+				fil._a1=2*((g-1)-(g+1)*cos)*ra0;
+				fil._a2=((g+1)-(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
+				fil._b0=g*((g+1)+(g-1)*cos+2*Math.sqrt(g)*alpha)*ra0;
+				fil._b1=-2*g*((g-1)+(g+1)*cos)*ra0;
+				fil._b2=g*((g+1)+(g-1)*cos-2*Math.sqrt(g)*alpha)*ra0;
 				break;
+			case "peaking":
 			case 5:
 				alpha=Math.sin(w0)/(2*q);
 				g=Math.pow(10,fil.gain.Get(0)/40);
 				ra0=1/(1+alpha/g);
-				fil.a1=-2*cos*ra0;
-				fil.a2=(1-alpha/g)*ra0;
-				fil.b0=(1+alpha*g)*ra0;
-				fil.b1=-2*cos*ra0;
-				fil.b2=(1-alpha*g)*ra0;
+				fil._a1=-2*cos*ra0;
+				fil._a2=(1-alpha/g)*ra0;
+				fil._b0=(1+alpha*g)*ra0;
+				fil._b1=-2*cos*ra0;
+				fil._b2=(1-alpha*g)*ra0;
 				break;
+			case "notch":
 			case 6:
 				alpha=Math.sin(w0)/(2*q);
 				ra0=1/(1+alpha);
-				fil.a1=-2*cos*ra0;
-				fil.a2=(1-alpha)*ra0;
-				fil.b0=fil.b2=ra0;
-				fil.b1=-2*cos*ra0;
+				fil._a1=-2*cos*ra0;
+				fil._a2=(1-alpha)*ra0;
+				fil._b0=fil._b2=ra0;
+				fil._b1=-2*cos*ra0;
 				break;
+			case "allpass":
 			case 7:
 				alpha=Math.sin(w0)/(2*q);
 				ra0=1/(1+alpha);
-				fil.a1=-2*cos*ra0;
-				fil.a2=(1-alpha)*ra0;
-				fil.b0=(1-alpha)*ra0;
-				fil.b1=-2*cos*ra0;
-				fil.b2=(1+alpha)*ra0;
+				fil._a1=-2*cos*ra0;
+				fil._a2=(1-alpha)*ra0;
+				fil._b0=(1-alpha)*ra0;
+				fil._b1=-2*cos*ra0;
+				fil._b2=(1+alpha)*ra0;
 				break;
 			}
 		};
@@ -750,18 +820,18 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this.detune._Process();
 			this.Q._Process();
 			this.gain._Process();
-			this.Setup(this);
+			this._Setup(this);
 			var inbuf=this._nodein[0].inbuf.buf;
 			var outbuf=this._nodeout[0].outbuf.buf;
 			for(var i=0;i<waapisimBufSize;++i) {
 				xl=inbuf[0][i];
 				xr=inbuf[1][i];
-				yl=this.b0*xl+this.b1*this.x1l+this.b2*this.x2l-this.a1*this.y1l-this.a2*this.y2l;
-				yr=this.b0*xr+this.b1*this.x1r+this.b2*this.x2r-this.a1*this.y1r-this.a2*this.y2r;
-				this.x2l=this.x1l; this.x2r=this.x1r;
-				this.x1l=xl; this.x1r=xr;
-				this.y2l=this.y1l; this.y2r=this.y1r;
-				this.y1l=yl; this.y1r=yr;
+				yl=this._b0*xl+this._b1*this._x1l+this._b2*this._x2l-this._a1*this._y1l-this._a2*this._y2l;
+				yr=this._b0*xr+this._b1*this._x1r+this._b2*this._x2r-this._a1*this._y1r-this._a2*this._y2r;
+				this._x2l=this._x1l; this._x2r=this._x1r;
+				this._x1l=xl; this._x1r=xr;
+				this._y2l=this._y1l; this._y2r=this._y1r;
+				this._y1l=yl; this._y1r=yr;
 				outbuf[0][i]=yl;
 				outbuf[1][i]=yr;
 			}
@@ -822,9 +892,9 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.context=ctx;
 		this.playbackState=0;
 		this.delayTime=new waapisimAudioParam(ctx,this,0,1,0);
-		this.bufl=new Float32Array(waapisimSampleRate);
-		this.bufr=new Float32Array(waapisimSampleRate);
-		this.index=0;
+		this._bufl=new Float32Array(waapisimSampleRate);
+		this._bufr=new Float32Array(waapisimSampleRate);
+		this._index=0;
 		this._Process=function() {
 			this.delayTime._Process();
 			var inbuf=this._nodein[0].inbuf.buf;
@@ -835,15 +905,15 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			if(offs>this.context.sampleRate)
 				offs=this.context.sampleRate;
 			for(var i=0;i<waapisimBufSize;++i) {
-				var idxr=this.index-offs;
+				var idxr=this._index-offs;
 				if(idxr<0)
 					idxr+=waapisimSampleRate;
-				outbuf[0][i]=this.bufl[idxr];
-				outbuf[1][i]=this.bufr[idxr];
-				this.bufl[this.index]=inbuf[0][i];
-				this.bufr[this.index]=inbuf[1][i];
-				if(++this.index>=waapisimSampleRate)
-					this.index=0;
+				outbuf[0][i]=this._bufl[idxr];
+				outbuf[1][i]=this._bufr[idxr];
+				this._bufl[this._index]=inbuf[0][i];
+				this._bufr[this._index]=inbuf[1][i];
+				if(++this._index>=waapisimSampleRate)
+					this._index=0;
 			}
 			this._nodeout[0].NodeEmitBuf();
 			this._nodein[0].NodeClear();
@@ -857,41 +927,33 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		waapisimDebug("create "+this._nodetype+this._nodeId);
 		this._targettype=3;
 		this.context=ctx;
-		this.type="sine";
-		this._typen=0;
+		this.type=0;
 		this._wavtable=null;
 		this.frequency=new waapisimAudioParam(ctx,this,1,20000,440);
 		this.detune=new waapisimAudioParam(ctx,this,-1200,1200,0);
 		this.playbackState=0;
-		this.phase=0;
-		this.whenstart=0;
-		this.whenstop=Number.MAX_VALUE;
+		this._phase=0;
+		this._whenstart=0;
+		this._whenstop=Number.MAX_VALUE;
 		this.start=this.noteOn=function(w) {
-			this.whenstart=w;
+			this._whenstart=w;
 			this.playbackState=1;
-			this.context.RegisterNode(this);
+			this.context._RegisterNode(this);
 		};
 		this.stop=this.noteOff=function(w) {
-			this.whenstop=w;
+			this._whenstop=w;
 		};
 		this.setWaveTable=function(tab) {
-			this.type="custom";
-			this._typen=4;
+			this.type=4;
 			this._wavtable=tab;
 		};
 		this._Process=function() {
 			var i;
-			switch(this.type) {
-			case 0: case "sine": this._typen=0; break;
-			case 1: case "square": this._typen=1; break;
-			case 2: case "sawtooth": this._typen=2; break;
-			case 3: case "triangle": this._typen=3; break;
-			}
 			this.frequency._Process();
 			this.detune._Process();
-			if(this.playbackState==1 && this.context.currentTime>=this.whenstart)
+			if(this.playbackState==1 && this.context.currentTime>=this._whenstart)
 				this.playbackState=2;
-			if(this.playbackState==2 && this.context.currentTime>=this.whenstop)
+			if(this.playbackState==2 && this.context.currentTime>=this._whenstop)
 				this.playbackState=3;
 			if(this.playbackState!=2) {
 				for(i=0;i<waapisimBufSize;++i)
@@ -899,19 +961,37 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				return;
 			}
 			var x1,x2,y,z;
-			if(this._typen==4) {
+			switch(this.type) {
+			case "sine":
+			case 0:
+				x1=0.5; x2=1.5; y=2*Math.PI; z=1/6.78;
+				break;
+			case "square":
+			case 1:
+				x1=0.5; x2=1.5; y=100000; z=0;
+				break;
+			case "sawtooth":
+			case 2:
+				x1=0; x2=2; y=2; z=0;
+				break;
+			case "triangle":
+			case 3:
+				x1=0.5; x2=1.5; y=4; z=0;
+				break;
+			case "custom":
+			case 4:
 				var obuf=this._nodeout[0].outbuf.buf;
 				for(i=0;i<waapisimBufSize;++i) {
 					var f=this.frequency.Get(i)*Math.pow(2,this.detune.Get(i)/1200);
 					var delta=f/this.context.sampleRate;
-					this.phase+=delta;
-					while(this.phase>=1)
-						this.phase-=1;
-					while(this.phase<0)
-						this.phase+=1;
+					this._phase+=delta;
+					while(this._phase>=1)
+						this._phase-=1;
+					while(this._phase<0)
+						this._phase+=1;
 					var out=0;
 					if(this._wavtable)
-						out=this._wavtable.buf[(4096*this.phase)|0];
+						out=this._wavtable.buf[(4096*this._phase)|0];
 					obuf[0][i]=obuf[1][i]=out;
 				}
 				this._nodeout[0].NodeEmitBuf();
@@ -919,30 +999,16 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				this.detune.Clear(true);
 				return;
 			}
-			switch(this._typen) {
-			case 1:
-				x1=0.5; x2=1.5; y=100000; z=0;
-				break;
-			case 2:
-				x1=0; x2=2; y=2; z=0;
-				break;
-			case 3:
-				x1=0.5; x2=1.5; y=4; z=0;
-				break;
-			default:
-				x1=0.5; x2=1.5; y=2*Math.PI; z=1/6.78;
-				break;
-			}
 			var obuf=this._nodeout[0].outbuf.buf;
 			for(i=0;i<waapisimBufSize;++i) {
 				var f=this.frequency.Get(i)*Math.pow(2,this.detune.Get(i)/1200);
 				var delta=f/this.context.sampleRate;
-				this.phase+=delta;
-				while(this.phase>=1)
-					this.phase-=1;
-				while(this.phase<0)
-					this.phase+=1;
-				var t=(Math.min(Math.max(this.phase ,x1-this.phase), x2-this.phase)-0.5)*y;
+				this._phase+=delta;
+				while(this._phase>=1)
+					this._phase-=1;
+				while(this._phase<0)
+					this._phase+=1;
+				var t=(Math.min(Math.max(this._phase ,x1-this._phase), x2-this._phase)-0.5)*y;
 				var out=t-t*t*t*z;
 				if(out>1.0)
 					out=1.0;
@@ -976,13 +1042,13 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.minDecibels=-100;
 		this.maxDecibels=-30;
 		this.smoothingTimeConstant=0;
-		this.fftInData=new Array(256);
-		this.fftOutData=new Array(128);
-		this.timeData=new Array(256);
-		this.fftIndex=0;
-		this.fftCurrentSize=0;
-		this.fftrev=new Array(256);
-		this.fft=function(n,data,mag) {
+		this._fftInData=new Array(256);
+		this._fftOutData=new Array(128);
+		this._timeData=new Array(256);
+		this._fftIndex=0;
+		this._fftCurrentSize=0;
+		this._fftrev=new Array(256);
+		this._fft=function(n,data,mag) {
 			var nh=n>>1;
 			var t=-2*Math.PI;
 			var m,mh,mq,i,j,jr,ji,kr,ki,xr,xi;
@@ -1013,60 +1079,61 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				}
 			}
 			data[0]=Math.min(1e-100,Math.abs(data[0]/n));
-			mag[0]=mag[0]*this.smoothingTimeConstant+(1-this.smoothingTimeConstant)*data[0];
+			var stc=Math.min(1,Math.max(0,this.smoothingTimeConstant));
+			mag[0]=mag[0]*stc+(1-stc)*data[0];
 			for(i=0;i<nh;++i) {
 				var v=Math.sqrt(data[i]*data[i]+data[n-i]*data[n-i])/n;
 				if(v<1e-100)
 					v=1e-100;
-				mag[i]=mag[i]*this.smoothingTimeConstant+(1-this.smoothingTimeConstant)*v;
+				mag[i]=mag[i]*stc+(1-stc)*v;
 			}
 		};
 		this.getByteFrequencyData=function(array) {
 			var range=this.maxDecibels-this.minDecibels;
 			for(var l=Math.min(array.length,this.frequencyBinCount),i=0;i<l;++i) {
-				var v=20*Math.LOG10E*Math.log(this.fftOutData[i]);
+				var v=20*Math.LOG10E*Math.log(this._fftOutData[i]);
 				array[i]=((Math.min(this.maxDecibels,Math.max(this.minDecibels,v))-this.minDecibels)*255/range)|0;
 			}
 		};
 		this.getFloatFrequencyData=function(array) {
 			for(var l=Math.min(array.length,this.frequencyBinCount),i=0;i<l;++i)
-				array[i]=20*Math.LOG10E*Math.log(this.fftOutData[i]);
+				array[i]=20*Math.LOG10E*Math.log(this._fftOutData[i]);
 		};
 		this.getByteTimeDomainData=function(array) {
 			for(var l=Math.min(this.frequencyBinCount,array.length),i=0;i<l;++i) {
-				var v=Math.min(1,Math.max(-1,this.timeData[i]));
+				var v=Math.min(1,Math.max(-1,this._timeData[i]));
 				array[i]=v*127+128;
 			}
 		};
 		this._Process=function() {
 			var i,j,k;
 			var inbuf=this._nodein[0].inbuf.buf;
-			if(this.fftSize!=this.fftCurrentSize) {
+			if(this.fftSize!=this._fftCurrentSize) {
 				var n=this.fftSize;
 				for(i=0;i<n;++i)
-					this.fftInData[i]=this.fftOutData[i]=0;
-				this.fftCurrentSize=n;
+					this._fftInData[i]=this._fftOutData[i]=0;
+				this._fftCurrentSize=n;
 				this.frequencyBinCount=n*0.5;
-				this.fftIndex=0;
-				this.fftrev[0]=0;
-				this.fftrev[n-1]=n-1;
+				this._fftIndex=0;
+				this._fftrev[0]=0;
+				this._fftrev[n-1]=n-1;
 				for(i=0,j=1;j<n-1;++j) {
 					for(k=n>>1;k>(i^=k);k>>=1)
 						;
-					this.fftrev[j]=i;
+					this._fftrev[j]=i;
 				}
 			}
 			for(i=0;i<waapisimBufSize;++i) {
 				var xl=inbuf[0][i];
 				var xr=inbuf[1][i];
 				this._nodeout[0].NodeEmit(i,xl,xr);
-				var v=this.timeData[this.fftIndex]=(xl+xr)*0.5;
-				var t=2*Math.PI*this.fftIndex/this.fftCurrentSize;
-//				this.fftInData[this.fftrev[this.fftIndex]]=v*(0.42-0.5*Math.cos(t)+0.08*Math.cos(t*2));
-				this.fftInData[this.fftrev[this.fftIndex]]=v*(0.5-0.5*Math.cos(t));
-				if(++this.fftIndex>=this.fftCurrentSize) {
-					this.fftIndex=0;
-					this.fft(this.fftCurrentSize,this.fftInData,this.fftOutData);
+				var v=this._timeData[this._fftIndex]=(xl+xr)*0.5;
+				var t=2*Math.PI*this._fftIndex/this._fftCurrentSize;
+//				this._fftInData[this._fftrev[this._fftIndex]]=v*(0.42-0.5*Math.cos(t)+0.08*Math.cos(t*2));
+				this._fftInData[this._fftrev[this._fftIndex]]=v*(0.5-0.5*Math.cos(t));
+				if(++this._fftIndex>=this._fftCurrentSize) {
+					this._fftIndex=0;
+					this._fft(this._fftCurrentSize,this._fftInData,this._fftOutData);
 				}
 			}
 			this._nodein[0].NodeClear();
@@ -1080,30 +1147,30 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.playbackState=0;
 		this.buffer=null;
 		this.normalize=true;
-		this.scale=1;
-		this.analyzed=null;
-		this.dlybufsize=waapisimSampleRate*5;
-		this.dlybuf=new waapisimAudioBuffer(2,this.dlybufsize,44100);
-		this.dlyidx=0;
-		this.tapsize=20;
-		this.tap=[];
-		this.kernel=null;
-		this.sum=[];
-		this.sum[0]=[];
-		this.sum[1]=[];
-		this.bitrev=[];
-		this.bitrev[0]=0;
-		this.bitrev[waapisimBufSize-1]=waapisimBufSize-1;
+		this._scale=1;
+		this._analyzed=null;
+		this._dlybufsize=waapisimSampleRate*5;
+		this._dlybuf=new waapisimAudioBuffer(2,this._dlybufsize,44100);
+		this._dlyidx=0;
+		this._tapsize=20;
+		this._tap=[];
+		this._kernel=null;
+		this._sum=[];
+		this._sum[0]=[];
+		this._sum[1]=[];
+		this._bitrev=[];
+		this._bitrev[0]=0;
+		this._bitrev[waapisimBufSize-1]=waapisimBufSize-1;
 		var i,j,k;
 		for(i=0,j=1;j<waapisimBufSize-1;++j) {
 			for(k=waapisimBufSize>>1;k>(i^=k);k>>=1)
 				;
-			this.bitrev[j]=i;
+			this._bitrev[j]=i;
 		}
 		for(i=0;i<2;++i)
 			for(j=0;j<2;++j)
-				this.sum[i][j]=new Float32Array(waapisimSampleRate);
-		this.Normalize=function(buffer) {
+				this._sum[i][j]=new Float32Array(waapisimSampleRate);
+		this._Normalize=function(buffer) {
 			var GainCalibration=0.00125;
 			var GainCalibrationSampleRate=44100;
 			var MinPower=0.000125;
@@ -1127,7 +1194,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			scale*=GainCalibration;
 			return scale;
 		};
-		this.Fft=function(n,a) {
+		this._Fft=function(n,a) {
 			var m,mh,mq,i,j,k,jr,ji,kr,ki;
 			var theta, wr, wi, xr, xi;
 			i=0;
@@ -1168,7 +1235,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				}
 			}
 		};
-		this.Fft2=function(n,ar,ai) {
+		this._Fft2=function(n,ar,ai) {
 			var m, mh, i, j, k;
 			var wr, wi, xr, xi;
 			var theta=2*Math.PI;
@@ -1212,13 +1279,13 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				var kbuf=[];
 				for(i=0;i<4;++i)
 					kbuf[i]=new waapisimAudioBuffer(2,waapisimBufSize,44100);
-				if(this.buffer!=this.analyzed) {
-					this.scale=1;
+				if(this.buffer!=this._analyzed) {
+					this._scale=1;
 					if(this.normalize)
-						this.scale=this.Normalize(this.buffer);
+						this._scale=this._Normalize(this.buffer);
 					var len=this.buffer.length;
-					for(i=0,px=0;i<this.tapsize;++i) {
-						var x=(i*len/this.tapsize)|0;
+					for(i=0,px=0;i<this._tapsize;++i) {
+						var x=(i*len/this._tapsize)|0;
 						var sz=x-px;
 						v0=0;
 						v1=0;
@@ -1228,12 +1295,12 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 								v1+=this.buffer.buf[1][px]*this.buffer.buf[1][px];
 								++px;
 							}
-							v0=Math.sqrt(v0)*this.scale*0.5;
-							v1=Math.sqrt(v1)*this.scale*0.5;
+							v0=Math.sqrt(v0)*this._scale*0.5;
+							v1=Math.sqrt(v1)*this._scale*0.5;
 						}
-						this.tap[i]=[x,v0,v1];
+						this._tap[i]=[x,v0,v1];
 					}
-					this.kernel=new waapisimAudioBuffer(2,waapisimBufSize,44100);
+					this._kernel=new waapisimAudioBuffer(2,waapisimBufSize,44100);
 					var p=0,maxp=0;
 					for(l=Math.min(this.buffer.length,waapisimBufSize*4),i=0,j=0,k=0;i<l;++i) {
 						v0=this.buffer.buf[0][i];
@@ -1243,7 +1310,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 						p+=(v0*v0+v1*v1);
 						if(++j>=waapisimBufSize) {
 							if(p>maxp) {
-								this.kernel=kbuf[k];
+								this._kernel=kbuf[k];
 								maxp=p;
 							}
 							j=0;
@@ -1251,49 +1318,49 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 							++k;
 						}
 					}
-					if(p>maxp||this.kernel===null)
-						this.kernel=kbuf[k];
-					this.Fft(waapisimBufSize,this.kernel.buf[0]);
-					this.Fft(waapisimBufSize,this.kernel.buf[1]);
-					this.analyzed=this.buffer;
+					if(p>maxp||this._kernel===null)
+						this._kernel=kbuf[k];
+					this._Fft(waapisimBufSize,this._kernel.buf[0]);
+					this._Fft(waapisimBufSize,this._kernel.buf[1]);
+					this._analyzed=this.buffer;
 				}
 				
-				this.Fft(waapisimBufSize,inbuf[0]);
-				this.Fft(waapisimBufSize,inbuf[1]);
-				this.sum[0][0][0]=this.sum[1][0][0]=this.sum[0][1][0]=this.sum[1][1][0]=0;
+				this._Fft(waapisimBufSize,inbuf[0]);
+				this._Fft(waapisimBufSize,inbuf[1]);
+				this._sum[0][0][0]=this._sum[1][0][0]=this._sum[0][1][0]=this._sum[1][1][0]=0;
 				for(i=1,j=waapisimBufSize-1;i<nh;++i,--j) {
-					var real0=inbuf[0][i]*this.kernel.buf[0][i]-inbuf[0][j]*this.kernel.buf[0][j];
-					var imag0=inbuf[0][i]*this.kernel.buf[0][j]+inbuf[0][j]*this.kernel.buf[0][i];
-					this.sum[0][0][i]=real0;
-					this.sum[0][0][j]=real0;
-					this.sum[0][1][i]=-imag0;
-					this.sum[0][1][j]=imag0;
-					var real1=inbuf[1][i]*this.kernel.buf[1][i]-inbuf[1][j]*this.kernel.buf[1][j];
-					var imag1=inbuf[1][i]*this.kernel.buf[1][j]+inbuf[1][j]*this.kernel.buf[1][i];
-					this.sum[1][0][i]=real1;
-					this.sum[1][0][j]=real1;
-					this.sum[1][1][i]=-imag1;
-					this.sum[1][1][j]=imag1;
+					var real0=inbuf[0][i]*this._kernel.buf[0][i]-inbuf[0][j]*this._kernel.buf[0][j];
+					var imag0=inbuf[0][i]*this._kernel.buf[0][j]+inbuf[0][j]*this._kernel.buf[0][i];
+					this._sum[0][0][i]=real0;
+					this._sum[0][0][j]=real0;
+					this._sum[0][1][i]=-imag0;
+					this._sum[0][1][j]=imag0;
+					var real1=inbuf[1][i]*this._kernel.buf[1][i]-inbuf[1][j]*this._kernel.buf[1][j];
+					var imag1=inbuf[1][i]*this._kernel.buf[1][j]+inbuf[1][j]*this._kernel.buf[1][i];
+					this._sum[1][0][i]=real1;
+					this._sum[1][0][j]=real1;
+					this._sum[1][1][i]=-imag1;
+					this._sum[1][1][j]=imag1;
 				}
 
-				this.Fft2(waapisimBufSize,this.sum[0][0],this.sum[0][1]);
-				this.Fft2(waapisimBufSize,this.sum[1][0],this.sum[1][1]);
+				this._Fft2(waapisimBufSize,this._sum[0][0],this._sum[0][1]);
+				this._Fft2(waapisimBufSize,this._sum[1][0],this._sum[1][1]);
 
 				for(i=0;i<waapisimBufSize;++i) {
 					var v=(nh-Math.abs(i-nh))/nh;
-					this.dlybuf.buf[0][this.dlyidx]=this.sum[0][0][i]*v;
-					this.dlybuf.buf[1][this.dlyidx]=this.sum[1][0][i]*v;
+					this._dlybuf.buf[0][this._dlyidx]=this._sum[0][0][i]*v;
+					this._dlybuf.buf[1][this._dlyidx]=this._sum[1][0][i]*v;
 					v0=0; v1=0;
-					for(l=this.tap.length,j=0;j<l;++j) {
-						var idx=this.dlyidx-this.tap[j][0];
+					for(l=this._tap.length,j=0;j<l;++j) {
+						var idx=this._dlyidx-this._tap[j][0];
 						if(idx<0)
-							idx+=this.dlybufsize;
-						v0+=this.dlybuf.buf[0][idx]*this.tap[j][1];
-						v1+=this.dlybuf.buf[1][idx]*this.tap[j][2];
+							idx+=this._dlybufsize;
+						v0+=this._dlybuf.buf[0][idx]*this._tap[j][1];
+						v1+=this._dlybuf.buf[1][idx]*this._tap[j][2];
 					}
 					this._nodeout[0].NodeEmit(i,v0,v1);
-					if(++this.dlyidx>=this.dlybufsize)
-						this.dlyidx=0;
+					if(++this._dlyidx>=this._dlybufsize)
+						this._dlyidx=0;
 				}
 
 			}
@@ -1356,7 +1423,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this.release.Clear(false);
 		};
 	};
-	waapisimPanner=AudioPannerNode=webkitAudioPannerNode=function(ctx) {
+	waapisimPanner=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,1,1);
 		this._nodetype="Panner";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
@@ -1388,12 +1455,15 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			var rl=Math.sqrt(rgain*rgain+lgain*lgain);
 			var dgain;
 			switch(this.distanceModel) {
+			case "linear":
 			case 0:
 				dgain=1-this.rolloffFactor*(d-this.refDistance)/(this.maxDistance-this.refDistance);
 				break;
+			case "inverse":
 			case 1:
 				dgain=this.refDistance/(this.refDistance+this.rolloffFactor*(d-this.refDistance));
 				break;
+			case "exponential":
 			case 2:
 				dgain=Math.pow(d/this.refDistance,-this.rolloffFactor);
 				break;

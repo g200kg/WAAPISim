@@ -1,9 +1,17 @@
 # WAAPISim : Web Audio API Simulator
 
-WAAPISim is a browser's 'Web Audio API' polyfill fallbacking to Firefox's 'Audio Data API' or Flash for MSIE/Opera.
+WAAPISim is a 'WebAudioAPI' polyfill fallbacking to the 'Audio Data API', or Flash.  
+In addition, even in WebAudio API ready browsers, add some latest method name for node-creation and start/stop if the browser does not support these method name. 
 
 WAAPISim automatically check the availability of APIs:  
 WebAudioAPI => AudioDataAPI => Flash
+
+* Chrome : WebAudioAPI is supported. WAAPISim do nothing.
+* Safari(6) : WebAudioAPI is supported but old method name is used. WAAPISim add new method name for node creation, start/stop and setTargetAtTime.
+* Firefox : Simulate using AudioDataAPI
+* Opera : Simulate using Flash
+* MSIE : Simulate using Flash. Float32Array is assigned to normal Array.
+
 
 **<http://www.g200kg.com/docs/waapisim/>**
 

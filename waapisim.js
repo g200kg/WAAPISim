@@ -69,7 +69,12 @@ if(typeof(webkitAudioContext)!=="undefined") {
 			var o=webkitAudioContext.prototype._createBufferSource.call(this);
 			o._playbackRate=o.playbackRate; o.playbackRate=o._playbackRate;
 			o.playbackRate.setTargetAtTime=o._playbackRate.setTargetValueAtTime;
-			o.start=o.noteOn;
+			o.start=function(w,off,dur) {
+				if(off===undefined)
+					o.noteOn(w);
+				else
+					o.noteGrainOn(w,off,dur);
+			};
 			o.stop=o.noteOff;
 			return o;
 		});
@@ -304,10 +309,11 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		}
 		waapisimWrittenpos+=waapisimOutBufSize*2;
 		for(l=waapisimOutBufSize*2,i=0;i<l;++i) {
-			var v=((waapisimOutBuf[i]+1)*32768);
+			var v=((waapisimOutBuf[i]+1)*32768)|0;
 			if(isNaN(v)) v=32768;
-			v=Math.min(65525,Math.max(1,v))|0;
-			s+=String.fromCharCode(Math.floor(v));
+			if(v>65525) v=65525;
+			if(v<1) v=1;
+			s+=String.fromCharCode(v);
 		}
 		return s;
 	};
@@ -895,6 +901,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this._bufl=new Float32Array(waapisimSampleRate);
 		this._bufr=new Float32Array(waapisimSampleRate);
 		this._index=0;
+		this._offscur=0;
 		this._Process=function() {
 			this.delayTime._Process();
 			var inbuf=this._nodein[0].inbuf.buf;
@@ -904,8 +911,9 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				offs=0;
 			if(offs>this.context.sampleRate)
 				offs=this.context.sampleRate;
+			var deltaoff=(offs-this._offscur)/waapisimBufSize;
 			for(var i=0;i<waapisimBufSize;++i) {
-				var idxr=this._index-offs;
+				var idxr=this._index-(this._offscur|0);
 				if(idxr<0)
 					idxr+=waapisimSampleRate;
 				outbuf[0][i]=this._bufl[idxr];
@@ -914,13 +922,13 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				this._bufr[this._index]=inbuf[1][i];
 				if(++this._index>=waapisimSampleRate)
 					this._index=0;
+				this._offscur+=deltaoff;
 			}
 			this._nodeout[0].NodeEmitBuf();
 			this._nodein[0].NodeClear();
 			this.delayTime.Clear(false);
 		};
 	};
-
 	waapisimOscillator=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,0,1);
 		this._nodetype="Osc";
@@ -960,62 +968,60 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					this._nodeout[0].outbuf.buf[0][i]=this._nodeout[0].outbuf.buf[1][i]=0;
 				return;
 			}
-			var x1,x2,y,z;
+			var t,x1,x2,y,z;
+			var obuf=this._nodeout[0].outbuf.buf;
+			var ph=this._phase;
+			var r=1/this.context.sampleRate;
+			var freq=this.frequency;
+			var detu=this.detune;
 			switch(this.type) {
 			case "sine":
 			case 0:
-				x1=0.5; x2=1.5; y=2*Math.PI; z=1/6.78;
+				x1=0.25; x2=1; y=2*Math.PI; z=1/6.78;
 				break;
 			case "square":
 			case 1:
-				x1=0.5; x2=1.5; y=100000; z=0;
+				x1=0.25; x2=1; y=100000; z=0;
 				break;
 			case "sawtooth":
 			case 2:
-				x1=0; x2=2; y=2; z=0;
+				x1=0.5; x2=2; y=2; z=0;
 				break;
 			case "triangle":
 			case 3:
-				x1=0.5; x2=1.5; y=4; z=0;
+				x1=0.25; x2=1; y=4; z=0;
 				break;
 			case "custom":
 			case 4:
-				var obuf=this._nodeout[0].outbuf.buf;
 				for(i=0;i<waapisimBufSize;++i) {
-					var f=this.frequency.Get(i)*Math.pow(2,this.detune.Get(i)/1200);
-					var delta=f/this.context.sampleRate;
-					this._phase+=delta;
-					while(this._phase>=1)
-						this._phase-=1;
-					while(this._phase<0)
-						this._phase+=1;
+					var f=freq.Get(i)*Math.pow(2,detu.Get(i)/1200);
+					ph+=f*r;
+					ph=ph-Math.floor(ph);
 					var out=0;
 					if(this._wavtable)
-						out=this._wavtable.buf[(4096*this._phase)|0];
+						out=this._wavtable.buf[(4096*ph)|0];
 					obuf[0][i]=obuf[1][i]=out;
 				}
+				this._phase=ph;
 				this._nodeout[0].NodeEmitBuf();
 				this.frequency.Clear(true);
 				this.detune.Clear(true);
 				return;
 			}
-			var obuf=this._nodeout[0].outbuf.buf;
 			for(i=0;i<waapisimBufSize;++i) {
-				var f=this.frequency.Get(i)*Math.pow(2,this.detune.Get(i)/1200);
-				var delta=f/this.context.sampleRate;
-				this._phase+=delta;
-				while(this._phase>=1)
-					this._phase-=1;
-				while(this._phase<0)
-					this._phase+=1;
-				var t=(Math.min(Math.max(this._phase ,x1-this._phase), x2-this._phase)-0.5)*y;
+				var f=freq.Get(i)*Math.pow(2,detu.Get(i)/1200);
+				ph+=f*r;
+				ph=ph-Math.floor(ph);
+				if(x2-ph<ph)
+					t=(x2-ph-x1)*y;
+				else
+					t=(ph-x1)*y;
 				var out=t-t*t*t*z;
-				if(out>1.0)
-					out=1.0;
-				if(out<-1.0)
-					out=-1.0;
+				if(out>1) out=1;
+				if(out<-1) out=-1;
 				obuf[0][i]=obuf[1][i]=out;
 			}
+			this._phase=ph;
 			this._nodeout[0].NodeEmitBuf();
 			this.frequency.Clear(true);
 			this.detune.Clear(true);

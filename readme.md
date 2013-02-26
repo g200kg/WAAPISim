@@ -13,6 +13,7 @@ WebAudioAPI => AudioDataAPI => Flash
 * MSIE : Simulate using Flash. Float32Array is assigned to normal Array.
 
 
+For more detail:
 **<http://www.g200kg.com/docs/waapisim/>**
 
 **WebAudioSynth running on MSIE**

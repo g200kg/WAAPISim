@@ -900,6 +900,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.delayTime=new waapisimAudioParam(ctx,this,0,1,0);
 		this._bufl=new Float32Array(waapisimSampleRate);
 		this._bufr=new Float32Array(waapisimSampleRate);
+		for(var i=0;i<waapisimSampleRate;++i)
+			this._bufl[i]=this._bufr[i]=0;
 		this._index=0;
 		this._offscur=0;
 		this._Process=function() {
@@ -909,8 +911,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			var offs=Math.floor(this.delayTime.Get(0)*this.context.sampleRate);
 			if(offs<0)
 				offs=0;
-			if(offs>this.context.sampleRate)
-				offs=this.context.sampleRate;
+			if(offs>=this.context.sampleRate)
+				offs=this.context.sampleRate-1;
 			var deltaoff=(offs-this._offscur)/waapisimBufSize;
 			for(var i=0;i<waapisimBufSize;++i) {
 				var idxr=this._index-(this._offscur|0);
@@ -1538,20 +1540,23 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		var i;
 		this._Process=function() {
 			var inbuf=this._nodein[0].inbuf.buf;
-			if(this.curve!==null) {
-				var len=this.curve.length-1;
-				for(i=0;i<waapisimBufSize;++i) {
-					var xl=Math.max(-1,Math.min(1,inbuf[0][i]));
-					var xr=Math.max(-1,Math.min(1,inbuf[1][i]));
-					xl=this.curve[((xl+1)*0.5*len+0.5)|0];
-					xr=this.curve[((xr+1)*0.5*len+0.5)|0];
-					this._nodeout[0].NodeEmit(i,xl,xr);
+			var curve=this.curve;
+			if(curve!==null) {
+				var len=curve.length-1;
+				if(len>=0) {
+					for(i=0;i<waapisimBufSize;++i) {
+						var xl=Math.max(-1,Math.min(1,inbuf[0][i]));
+						var xr=Math.max(-1,Math.min(1,inbuf[1][i]));
+						xl=curve[((xl+1)*0.5*len+0.5)|0];
+						xr=curve[((xr+1)*0.5*len+0.5)|0];
+						this._nodeout[0].NodeEmit(i,xl,xr);
+					}
+					this._nodein[0].NodeClear();
+					return;
 				}
 			}
-			else {
-				for(i=0;i<waapisimBufSize;++i)
-					this._nodeout[0].NodeEmit(i,inbuf[0][i],inbuf[1][i]);
-			}
+			for(i=0;i<waapisimBufSize;++i)
+				this._nodeout[0].NodeEmit(i,inbuf[0][i],inbuf[1][i]);
 			this._nodein[0].NodeClear();
 		};
 	};

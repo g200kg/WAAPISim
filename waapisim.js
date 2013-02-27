@@ -234,7 +234,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 	waapisimDummybuf=new waapisimAudioBuffer(2,waapisimBufSize,waapisimSampleRate);
 	waapisimSetupOutBuf=function(offset) {
 		var numctx=waapisimContexts.length;
-		var l,i,j,n,node;
+		var l,i,j,k,n,node;
 		for(l=(offset+waapisimBufSize)*2,i=offset*2;i<l;i+=2)
 			waapisimOutBuf[i]=waapisimOutBuf[i+1]=0;
 		for(n=0;n<numctx;++n) {
@@ -383,6 +383,22 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.createWaveTable=function(real,imag) {
 			return new waapisimWaveTable(real,imag);
 		};
+		this._SortNode=function() {
+			var i,j,k,n;
+			for(i=0;i<this._Nodes.length;++i) {
+				n=this._Nodes[i];
+				if(n._order>0) {
+					for(j=0;j<n._nodein.length;++j) {
+						for(k=0;k<n._nodein[j].from.length;++k) {
+							var o=n._nodein[j].from[k].node._order;
+							if(n._order<o+1)
+								n._order=o+1;
+						}
+					}
+				}
+			}
+			this._Nodes.sort(function(a,b){return b._order-a._order;});
+		}
 		this._RegisterNode=function(node) {
 			for(var i=this._Nodes.length;i--;) {
 				if(this._Nodes[i]===node) {
@@ -390,6 +406,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				}
 			}
 			this._Nodes.push(node);
+			this._SortNode();
 			return true;
 		};
 		this._UnregisterNode=function(node) {
@@ -462,6 +479,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.numberOfInputs=numin;
 		this.numberOfOutputs=numout;
 		this._nodeId=waapisimNodeId;
+		this._order=1;
 		++waapisimNodeId;
 		this._targettype=1;
 		this.context=null;
@@ -478,15 +496,18 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				output=0;
 			if(typeof(input)==="undefined")
 				input=0;
-			if(next._targettype!==0)
-				this._nodeout[output].connect(next._nodein[input]);
-			else
-				this._nodeout[output].connect(next);
+			if(this._nodeout[output]) {
+				if(next._targettype!==0)
+					this._nodeout[output].connect(next._nodein[input]);
+				else
+					this._nodeout[output].connect(next);
+			}
 		};
 		this.disconnect=function(output) {
 			if(typeof(output)==="undefined")
 				output=0;
-			this._nodeout[output].disconnect();
+			if(this._nodeout[output])
+				this._nodeout[output].disconnect();
 		};
 	};
 	waapisimAudioNodeIn=function(node,size) {
@@ -504,6 +525,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 
 		this.connect=function(next) {
 			waapisimDebug("connect "+this.node._nodetype+this.node._nodeId+"=>"+next.node._nodetype+next.node._nodeId);
+			if(next===undefined)
+				return;
 			if(next.from.indexOf(this)!=-1)
 				return;
 			next.from.push(this);
@@ -585,11 +608,12 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		ctx._Nodes.push(this);
 	};
 	
-	waapisimAudioBufferSource=function(ctx) {
+	waapisimAudioBufferSource=webkitAudioBufferSourceNode=AudioBufferSourceNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,0,1);
 		this._nodetype="BufSrc";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
 		this._targettype=3;
+		this._order=0;
 		this.context=ctx;
 		this.playbackState=0;
 		this.buffer=null;
@@ -713,7 +737,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		};
 		ctx._RegisterNode(this);
 	};
-	waapisimBiquadFilter=function(ctx) {
+	waapisimBiquadFilter=webkitBiquadFilterNode=BiquadFilterNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,1,1);
 		this._nodetype="Filter";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
@@ -931,11 +955,12 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this.delayTime.Clear(false);
 		};
 	};
-	waapisimOscillator=function(ctx) {
+	waapisimOscillator=webkitOscillatorNode=OscillatorNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,0,1);
 		this._nodetype="Osc";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
 		this._targettype=3;
+		this._order=0;
 		this.context=ctx;
 		this.type=0;
 		this._wavtable=null;
@@ -1045,14 +1070,14 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		waapisimDebug("create "+this._nodetype+this._nodeId);
 		this.context=ctx;
 		this.playbackState=0;
-		this.fftSize=512;
-		this.frequencyBinCount=128;
+		this.fftSize=2048;
+		this.frequencyBinCount=1024;
 		this.minDecibels=-100;
 		this.maxDecibels=-30;
 		this.smoothingTimeConstant=0;
-		this._fftInData=new Array(256);
-		this._fftOutData=new Array(128);
-		this._timeData=new Array(256);
+		this._fftInData=new Array(2048);
+		this._fftOutData=new Array(2048);
+		this._timeData=new Array(2048);
 		this._fftIndex=0;
 		this._fftCurrentSize=0;
 		this._fftrev=new Array(256);
@@ -1431,7 +1456,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this.release.Clear(false);
 		};
 	};
-	waapisimPanner=function(ctx) {
+	waapisimPanner=webkitAudioPannerNode=AudioPannerNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,1,1);
 		this._nodetype="Panner";
 		waapisimDebug("create "+this._nodetype+this._nodeId);

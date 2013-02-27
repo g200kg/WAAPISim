@@ -504,10 +504,9 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			}
 		};
 		this.disconnect=function(output) {
-			if(typeof(output)==="undefined")
+			if(typeof(this._nodeout[output])==="undefined")
 				output=0;
-			if(this._nodeout[output])
-				this._nodeout[output].disconnect();
+			this._nodeout[output].disconnect();
 		};
 	};
 	waapisimAudioNodeIn=function(node,size) {
@@ -700,6 +699,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this._targettype=2;
 		this.context=ctx;
 		this.playbackState=0;
+		if(typeof(bufsize)!=="number")
+			throw(new TypeError("ScriptProcessor:bufferSize"));
 		if(typeof(inch)==="undefined")
 			inch=2;
 		if(typeof(outch)==="undefined")
@@ -942,10 +943,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				var idxr=this._index-(this._offscur|0);
 				if(idxr<0)
 					idxr+=waapisimSampleRate;
-				outbuf[0][i]=this._bufl[idxr];
-				outbuf[1][i]=this._bufr[idxr];
 				this._bufl[this._index]=inbuf[0][i];
 				this._bufr[this._index]=inbuf[1][i];
+				outbuf[0][i]=this._bufl[idxr];
+				outbuf[1][i]=this._bufr[idxr];
 				if(++this._index>=waapisimSampleRate)
 					this._index=0;
 				this._offscur+=deltaoff;

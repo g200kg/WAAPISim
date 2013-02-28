@@ -309,10 +309,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		}
 		waapisimWrittenpos+=waapisimOutBufSize*2;
 		for(l=waapisimOutBufSize*2,i=0;i<l;++i) {
-			var v=((waapisimOutBuf[i]+1)*32768)|0;
+			var v=(waapisimOutBuf[i]*16384+32768)|0;
 			if(isNaN(v)) v=32768;
-			if(v>65525) v=65525;
-			if(v<1) v=1;
+			if(v>49152) v=49152;
+			if(v<16384) v=16384;
 			s+=String.fromCharCode(v);
 		}
 		return s;

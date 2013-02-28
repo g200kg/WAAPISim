@@ -23,7 +23,7 @@ public function GetSamples(event:SampleDataEvent):void {
 	var dat:String = ExternalInterface.call("waapisimFlashGetData");
 	var l:uint=dat.length;
 	for(var i:int=0;i<l;++i) {
-		event.data.writeFloat(dat.charCodeAt(i)/32768-1);
+		event.data.writeFloat((dat.charCodeAt(i)-32768)/16384);
 	}
 }
 

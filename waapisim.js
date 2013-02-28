@@ -161,6 +161,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			inbuf=new Uint8Array(ch);
 			var mixtomono=len;
 			var riff=this.Get4BStr(inbuf,0);
+			this.length=0;
 			if(riff=="RIFF") {
 				var filesize=this.GetDw(inbuf,4)+8;
 				var wave=this.Get4BStr(inbuf,8);
@@ -378,7 +379,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		};
 		this.decodeAudioData=function(audioData,successCallback,errorCallback) {
 			var buf=new waapisimAudioBuffer(audioData,false);
-			successCallback(buf);
+			if(buf.length>0)
+				successCallback(buf);
+			else
+				errorCallback();
 		};
 		this.createWaveTable=function(real,imag) {
 			return new waapisimWaveTable(real,imag);
@@ -483,7 +487,6 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		++waapisimNodeId;
 		this._targettype=1;
 		this.context=null;
-		this.bufsize=size;
 		this._nodein=[];
 		this._nodeout=[];
 		var i;
@@ -875,6 +878,21 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this.Q.Clear(false);
 			this.gain.Clear(false);
 		};
+		this.getFrequencyResponse=function(f,m,p) {
+			for(var l=f.length,i=0;i<l;++i) {
+				var w=2*Math.PI*f[i]/this.context.sampleRate;
+				var cw=Math.cos(w);
+				var cw2=Math.cos(w*2);
+				var sw=Math.sin(w);
+				var sw2=Math.sin(w*2);
+				var ca=1+this._a1*cw+this._a2*cw2;
+				var sa=this._a1*sw+this._a2*sw2;
+				var cb=this._b0+this._b1*cw+this._b2*cw2;
+				var sb=this._b1*sw+this._b2*sw2;
+				m[i]=Math.sqrt((cb*cb+sb*sb)/(ca*ca+sa*sa));
+				p[i]=Math.atan2(sa,ca)-Math.atan2(sb,cb);
+			}
+		}
 	};
 	waapisimBiquadFilter.LOWPASS=waapisimBiquadFilter.prototype.LOWPASS=0;
 	waapisimBiquadFilter.HIGHPASS=waapisimBiquadFilter.prototype.HIGHPASS=1;
@@ -1446,11 +1464,12 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				var maxc=Math.sqrt(Math.max(this._maxl,this._maxr))*1.414;
 				if(maxc>thresh) {
 					var v=Math.pow(thresh*Math.min(knee,maxc/thresh)/maxc,1-1/ratio);
-					this._gain=v+(this._gain-v)*atkratio; // v+(this._gain-v)*atkratio;
+					this._gain=v+(this._gain-v)*atkratio;
 				}
+				else
+					this._gain=1+(this._gain-1)*relratio;
 				var g=this._gain*makeup;
 				this._nodeout[0].NodeEmit(i,inbuf[0][i]*g,inbuf[1][i]*g);
-				this._gain=1+(this._gain-1)*relratio;
 			}
 			this.reduction.value=this.reduction.computedValue=reduc;
 			this._nodein[0].NodeClear();

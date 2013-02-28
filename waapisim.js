@@ -668,7 +668,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				return;
 			var b0=this.buffer.getChannelData(0);
 			var b1=this.buffer.getChannelData(1);
-			var rate=44100/this.buffer.sampleRate;
+			var rate=this.buffer.sampleRate/44100;
 			if(this._nodeout[0].to.length>0) {
 				for(var i=0;i<waapisimBufSize;++i) {
 					if(this._bufferindex<this._endindex) {

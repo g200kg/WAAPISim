@@ -617,6 +617,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.playbackState=0;
 		this.buffer=null;
 		this.playbackRate=new waapisimAudioParam(ctx,this,0,10,1);
+		this.gain=new waapisimAudioParam(ctx,this,0,1,1); // Undocumented
 		this.loop=false;
 		this.loopStart=0;
 		this.loopEnd=0;
@@ -672,9 +673,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			if(this._nodeout[0].to.length>0) {
 				for(var i=0;i<waapisimBufSize;++i) {
 					if(this._bufferindex<this._endindex) {
+						var g=this.gain.Get(i);
 						var idx=this._bufferindex|0;
-						this._nodeout[0].outbuf.buf[0][i]=b0[idx];
-						this._nodeout[0].outbuf.buf[1][i]=b1[idx];
+						this._nodeout[0].outbuf.buf[0][i]=b0[idx]*g;
+						this._nodeout[0].outbuf.buf[1][i]=b1[idx]*g;
 					}
 					this._bufferindex+=rate*this.playbackRate.Get(i);
 					if(this.loop) {
@@ -891,24 +893,30 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.playbackState=0;
 		this.gain=new waapisimAudioParam(ctx,this,0,1,1);
 		this._nodein[0].NodeClear();
+		this._curgain=1;
 		this._Process=function() {
 			var i;
 			this.gain._Process();
 			var inbuf=this._nodein[0].inbuf.buf;
 			switch(this._nodeout[0].to.length) {
 			case 0:
+				this._curgain=this.gain.Get(0);
 				break;
 			case 1:
 				var b=this._nodeout[0].to[0].inbuf.buf;
 				for(i=0;i<waapisimBufSize;++i) {
 					var g=this.gain.Get(i);
-					b[0][i]+=inbuf[0][i]*g;
-					b[1][i]+=inbuf[1][i]*g;
+					this._curgain+=(g-this._curgain)*0.01;
+					b[0][i]+=inbuf[0][i]*this._curgain;
+					b[1][i]+=inbuf[1][i]*this._curgain;
 				}
 				break;
 			default:
-				for(i=0;i<waapisimBufSize;++i)
-					this._nodeout[0].NodeEmit(i,inbuf[0][i]*this.gain.Get(i),inbuf[1][i]*this.gain.Get(i));
+				for(i=0;i<waapisimBufSize;++i) {
+					var g=this.gain.Get(i);
+					this._curgain+=(g-this._curgain)*0.01;
+					this._nodeout[0].NodeEmit(i,inbuf[0][i]*this._curgain,inbuf[1][i]*this._curgain);
+				}
 				break;
 			}
 			this._nodein[0].NodeClear();
@@ -968,7 +976,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.frequency=new waapisimAudioParam(ctx,this,1,20000,440);
 		this.detune=new waapisimAudioParam(ctx,this,-1200,1200,0);
 		this.playbackState=0;
-		this._phase=0;
+		this._phase=0.5;
 		this._whenstart=0;
 		this._whenstop=Number.MAX_VALUE;
 		this.start=this.noteOn=function(w) {
@@ -1005,19 +1013,19 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			switch(this.type) {
 			case "sine":
 			case 0:
-				x1=0.25; x2=1; y=2*Math.PI; z=1/6.78;
+				x1=0.5; x2=1.5; y=2*Math.PI; z=1/6.78;
 				break;
 			case "square":
 			case 1:
-				x1=0.25; x2=1; y=100000; z=0;
+				x1=0.5; x2=1.5; y=100000; z=0;
 				break;
 			case "sawtooth":
 			case 2:
-				x1=0.5; x2=2; y=2; z=0;
+				x1=0; x2=2; y=2; z=0;
 				break;
 			case "triangle":
 			case 3:
-				x1=0.25; x2=1; y=4; z=0;
+				x1=0.5; x2=1.5; y=4; z=0;
 				break;
 			case "custom":
 			case 4:
@@ -1040,10 +1048,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				var f=freq.Get(i)*Math.pow(2,detu.Get(i)/1200);
 				ph+=f*r;
 				ph=ph-Math.floor(ph);
-				if(x2-ph<ph)
-					t=(x2-ph-x1)*y;
-				else
-					t=(ph-x1)*y;
+				t = ( Math.min( Math.max(ph ,x1 - ph), x2 - ph) - 0.5) * y;
 				var out=t-t*t*t*z;
 				if(out>1) out=1;
 				if(out<-1) out=-1;
@@ -1441,7 +1446,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				var maxc=Math.sqrt(Math.max(this._maxl,this._maxr))*1.414;
 				if(maxc>thresh) {
 					var v=Math.pow(thresh*Math.min(knee,maxc/thresh)/maxc,1-1/ratio);
-					this._gain=v+(this._gain-v)*atkratio;
+					this._gain=v+(this._gain-v)*atkratio; // v+(this._gain-v)*atkratio;
 				}
 				var g=this._gain*makeup;
 				this._nodeout[0].NodeEmit(i,inbuf[0][i]*g,inbuf[1][i]*g);

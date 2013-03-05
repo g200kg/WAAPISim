@@ -29,6 +29,10 @@ Try these pages with Firefox/Opera or MSIE.
 [ChannelSplitter/ChannelMerger test](http://www.g200kg.com/docs/waapisim/test-split.html)  
 [Oscillator custom waveform test](http://www.g200kg.com/docs/waapisim/samples/test-osccustom.html)  
 
+And **Shiny Happy MIDI Drum Machine (MIDIDrum ver.)** with WAAPISim  
+**<http://g200kg.github.com/MIDIDrums/>**
+
+
 ## Current Status
 
 WAAPISim is still not completed. It is tentative and partial implementation.

@@ -34,7 +34,7 @@ if(typeof(Uint8Array)==="undefined") {
 }
 
 if(typeof(waapisimLogEnable)!=="undefined"&&waapisimLogEnable)
-	waapisimDebug=console.log;
+	waapisimDebug=function(a) {console.log(a);};
 else
 	waapisimDebug=function(){};
 
@@ -1410,7 +1410,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					v0=0; v1=0;
 					for(l=this._tap.length,j=0;j<l;++j) {
 						var idx=this._dlyidx-this._tap[j][0];
-						if(idx<0)
+						while(idx<0)
 							idx+=this._dlybufsize;
 						v0+=this._dlybuf.buf[0][idx]*this._tap[j][1];
 						v1+=this._dlybuf.buf[1][idx]*this._tap[j][2];
@@ -1419,7 +1419,6 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					if(++this._dlyidx>=this._dlybufsize)
 						this._dlyidx=0;
 				}
-
 			}
 			this._nodein[0].NodeClear();
 		};

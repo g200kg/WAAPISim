@@ -32,7 +32,7 @@ Try these pages with Firefox/Opera or MSIE.
 **Shiny Happy MIDI Drum Machine (MIDIDrums)** (by Chris Wilson + (Chris Rogers and Ken Moore)) with WAAPISim  
 **<http://g200kg.github.com/MIDIDrums/>** forked from <https://github.com/cwilso/MIDIDrums>  
 
-**WebAudioSynth** (by aike) with WAAPISim
+**WebAudioSynth** (by aike) with WAAPISim  
 **<http://g200kg.github.com/webaudiosynth/>** forked from <https://github.com/aike/webaudiosynth>  
 
 ## Current Status

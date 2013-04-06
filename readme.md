@@ -10,7 +10,7 @@ WebAudioAPI => AudioDataAPI => Flash
 * Safari (include iOS) : WebAudioAPI is supported but old method name is used. WAAPISim add new method name for node-creation, start/stop and setTargetAtTime.
 * Firefox : Simulate using AudioDataAPI
 * Opera : Simulate using Flash
-* MSIE : Simulate using Flash. Float32Array is assigned to normal Array.
+* MSIE : Simulate using Flash. Float32Array is assigned to normal Array(IE9).
 
 
 For more detail:

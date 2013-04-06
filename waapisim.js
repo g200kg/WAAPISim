@@ -132,6 +132,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 	waapisimAudioBuffer=function(ch,len,rate) {
 		var i,j;
 		if(typeof(ch)=="number") {
+			len|=0;
 			this.sampleRate=rate;
 			this.length=len;
 			this.duration=len/this.sampleRate;

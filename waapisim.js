@@ -1703,7 +1703,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			}
 		};
 		this.Get=function(n) {
-			this.computedValue=parseInt(this.value)+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;
+			this.computedValue=parseFloat(this.value)+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;
 			return this.computedValue;
 		};
 		this.Clear=function(arate) {

@@ -751,10 +751,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.context=ctx;
 		this.playbackState=0;
 		this.type=0;
-		this.frequency=new waapisimAudioParam(ctx,this,10,24000,350);
-		this.detune=new waapisimAudioParam(ctx,this,-1200,1200,0);
-		this.Q=new waapisimAudioParam(ctx,this,0.0001,1000,1);
-		this.gain=new waapisimAudioParam(ctx,this,-40,40,0);
+		this.frequency=new waapisimAudioParam(ctx,this,10,24000,350,0.5);
+		this.detune=new waapisimAudioParam(ctx,this,-4800,4800,0,0.5);
+		this.Q=new waapisimAudioParam(ctx,this,0.0001,1000,1,0.5);
+		this.gain=new waapisimAudioParam(ctx,this,-40,40,0,0.5);
 		this._a1=this._a2=0;
 		this._b0=this._b1=this._b2=0;
 		this._x1l=this._x1r=this._x2l=this._x2r=0;
@@ -992,8 +992,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.context=ctx;
 		this.type=0;
 		this._wavtable=null;
-		this.frequency=new waapisimAudioParam(ctx,this,1,20000,440);
-		this.detune=new waapisimAudioParam(ctx,this,-1200,1200,0);
+		this.frequency=new waapisimAudioParam(ctx,this,1,20000,440,0.9995);
+		this.detune=new waapisimAudioParam(ctx,this,-4800,4800,0,0.9995);
 		this.playbackState=0;
 		this._phase=0.5;
 		this._whenstart=0;
@@ -1610,7 +1610,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			this._nodein[0].NodeClear();
 		};
 	};
-	waapisimAudioParam=function(ctx,node,min,max,def) {
+	waapisimAudioParam=function(ctx,node,min,max,def,tcon) {
 		this.context=ctx;
 		this._targettype=0;
 		this.node=node;
@@ -1619,6 +1619,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this.minValue=min;
 		this.maxValue=max;
 		this.defaultValue=def;
+		if(typeof(tcon)==="undefined")
+			this.timeconst=0;
+		else
+			this.timeconst=tcon;
 		this.from=[];
 		this.inbuf={};
 		this.inbuf.buf=[];
@@ -1703,7 +1707,10 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			}
 		};
 		this.Get=function(n) {
-			this.computedValue=parseFloat(this.value)+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;
+			if(this.from.length>0)
+				this.computedValue=parseFloat(this.value)+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;
+			else
+				this.computedValue=this.computedValue*this.timeconst+(1-this.timeconst)*parseFloat(this.value);
 			return this.computedValue;
 		};
 		this.Clear=function(arate) {

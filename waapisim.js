@@ -998,6 +998,7 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		this._phase=0.5;
 		this._whenstart=0;
 		this._whenstop=Number.MAX_VALUE;
+		this._init=0;
 		this.start=this.noteOn=function(w) {
 			this._whenstart=w;
 			this.playbackState=1;
@@ -1012,6 +1013,11 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 		};
 		this._Process=function() {
 			var i;
+			if(this._init==0) {
+				this.frequency.Init();
+				this.detune.Init();
+				this._init=1;
+			}
 			this.frequency._Process();
 			this.detune._Process();
 			if(this.playbackState==1 && this.context.currentTime>=this._whenstart)
@@ -1706,6 +1712,9 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				}
 			}
 		};
+		this.Init=function() {
+			this.computedValue=parseFloat(this.value);
+		}
 		this.Get=function(n) {
 			if(this.from.length>0)
 				this.computedValue=parseFloat(this.value)+(this.inbuf.buf[0][n]+this.inbuf.buf[1][n])*0.5;

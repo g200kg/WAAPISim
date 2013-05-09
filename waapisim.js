@@ -188,7 +188,26 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 							this.duration=this.length/this.sampleRate;
 							var v0,v1;
 							for(i=0,j=0;i<this.length;++i) {
-								if(wavbits==16) {
+								if(wavbits==24) {
+									if(wavch==2) {
+										v0=inbuf[idx+j+9]+(inbuf[idx+j+10]<<8);
+										v1=inbuf[idx+j+12]+(inbuf[idx+j+13]<<8);
+										if(v0>=32768) v0=v0-65536;
+										if(v1>=32768) v1=v1-65536;
+										if(mixtomono===true)
+											v0=v1=(v0+v1)*0.5;
+										this.buf[0][i]=v0/32768;
+										this.buf[1][i]=v1/32768;
+										j+=6;
+									}
+									else {
+										v=inbuf[idx+j+9]+(inbuf[idx+j+10]<<8);
+										if(v>=32768) v=v-65536;
+										this.buf[0][i]=this.buf[1][i]=v/32768;
+										j+=3;
+									}
+								}
+								else if(wavbits==16) {
 									if(wavch==2) {
 										v0=inbuf[idx+j+8]+(inbuf[idx+j+9]<<8);
 										v1=inbuf[idx+j+10]+(inbuf[idx+j+11]<<8);
@@ -1339,15 +1358,23 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			var inbuf=this._nodein[0].inbuf.buf;
 			var nh=(waapisimBufSize*0.5)|0;
 			var i,j,k,l,px,v0,v1;
+			
 			if(this.buffer!==null) {
-				var kbuf=[];
-				for(i=0;i<4;++i)
-					kbuf[i]=new waapisimAudioBuffer(2,waapisimBufSize,44100);
 				if(this.buffer!=this._analyzed) {
+					var kbuf=[];
+					for(i=0;i<4;++i)
+						kbuf[i]=new waapisimAudioBuffer(2,waapisimBufSize,44100);
 					this._scale=1;
 					if(this.normalize)
 						this._scale=this._Normalize(this.buffer);
 					var len=this.buffer.length;
+					for(i=len-1;i;--i) {
+						if(Math.abs(this.buffer.buf[0][i])>1e-3)
+							break;
+						if(Math.abs(this.buffer.buf[1][i])>1e-3)
+							break;
+					}
+					len=i+1;
 					for(i=0,px=0;i<this._tapsize;++i) {
 						var x=(i*len/this._tapsize)|0;
 						var sz=x-px;
@@ -1388,7 +1415,6 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					this._Fft(waapisimBufSize,this._kernel.buf[1]);
 					this._analyzed=this.buffer;
 				}
-				
 				this._Fft(waapisimBufSize,inbuf[0]);
 				this._Fft(waapisimBufSize,inbuf[1]);
 				this._sum[0][0][0]=this._sum[1][0][0]=this._sum[0][1][0]=this._sum[1][1][0]=0;
@@ -1406,10 +1432,8 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 					this._sum[1][1][i]=-imag1;
 					this._sum[1][1][j]=imag1;
 				}
-
 				this._Fft2(waapisimBufSize,this._sum[0][0],this._sum[0][1]);
 				this._Fft2(waapisimBufSize,this._sum[1][0],this._sum[1][1]);
-
 				for(i=0;i<waapisimBufSize;++i) {
 					var v=(nh-Math.abs(i-nh))/nh;
 					this._dlybuf.buf[0][this._dlyidx]=this._sum[0][0][i]*v;

@@ -1538,9 +1538,6 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			var dy=this.py-listener.py;
 			var dz=this.pz-listener.pz;
 			var d=Math.max(1,Math.sqrt(dx*dx+dy*dy+dz*dz));
-			var rgain=dx-dz;
-			var lgain=-dx-dz;
-			var rl=Math.sqrt(rgain*rgain+lgain*lgain);
 			var dgain;
 			switch(this.distanceModel) {
 			case "linear":
@@ -1556,6 +1553,29 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				dgain=Math.pow(d/this.refDistance,-this.rolloffFactor);
 				break;
 			}
+			var rgain,lgain,tr;
+			document.title=dz;
+			if(Math.abs(dz)<0.001) {
+				lgain=rgain=1;
+			}
+			else {
+				tr=Math.atan(dx/dz);
+				if(dz<0) {
+					rgain=-tr+Math.PI*0.5;
+					lgain=tr+Math.PI*0.5;
+				}
+				else if(dx>=0) {
+					rgain=tr+Math.PI*0.5;
+					lgain=-(-tr+Math.PI*0.5);
+				}
+				else {
+					rgain=-(tr+Math.PI*0.5);
+					lgain=-tr+Math.PI*0.5;
+				}
+			}
+//			var rgain=dx-dz;
+//			var lgain=-dx-dz;
+			var rl=Math.sqrt(rgain*rgain+lgain*lgain);
 			if(rl===0)
 				rgain=lgain=Math.sqrt(2)*dgain;
 			else {

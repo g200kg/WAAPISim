@@ -1554,7 +1554,6 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 				break;
 			}
 			var rgain,lgain,tr;
-			document.title=dz;
 			if(Math.abs(dz)<0.001) {
 				lgain=rgain=1;
 			}

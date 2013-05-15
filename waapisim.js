@@ -1559,30 +1559,34 @@ if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined
 			}
 			else {
 				tr=Math.atan(dx/dz);
-				if(dz<0) {
+				if(dz<=0) {
 					rgain=-tr+Math.PI*0.5;
 					lgain=tr+Math.PI*0.5;
 				}
-				else if(dx>=0) {
-					rgain=tr+Math.PI*0.5;
-					lgain=-(-tr+Math.PI*0.5);
-				}
 				else {
-					rgain=-(tr+Math.PI*0.5);
-					lgain=-tr+Math.PI*0.5;
+					switch(this.panningModel) {
+					case 0:
+					case "equalpower":
+						rgain=tr+Math.PI*0.5;
+						lgain=-tr+Math.PI*0.5;
+						break;
+					default:
+						if(dx>=0) {
+							rgain=tr+Math.PI*0.5;
+							lgain=-(-tr+Math.PI*0.5);
+						}
+						else {
+							rgain=-(tr+Math.PI*0.5);
+							lgain=-tr+Math.PI*0.5;
+						}
+					}
 				}
 			}
-//			var rgain=dx-dz;
-//			var lgain=-dx-dz;
 			var rl=Math.sqrt(rgain*rgain+lgain*lgain);
-			if(rl===0)
-				rgain=lgain=Math.sqrt(2)*dgain;
-			else {
-				rgain=rgain/rl;
-				lgain=lgain/rl;
-				var a=Math.sqrt(rgain*rgain+lgain*lgain);
-				rgain=rgain/a*2*dgain; lgain=lgain/a*2*dgain;
-			}
+			rgain=rgain/rl;
+			lgain=lgain/rl;
+			var a=Math.sqrt(rgain*rgain+lgain*lgain);
+			rgain=rgain/a*2*dgain; lgain=lgain/a*2*dgain;
 			for(var i=0;i<waapisimBufSize;++i)
 				this._nodeout[0].NodeEmit(i,inbuf[0][i]*lgain,inbuf[1][i]*rgain);
 			this._nodein[0].NodeClear();

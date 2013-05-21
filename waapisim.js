@@ -104,8 +104,8 @@ if(typeof(webkitAudioContext)!=="undefined") {
 		});
 	}
 }
-
-if(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined") {
+if((typeof(AudioContext)!=="undefined"&&typeof(AudioContext.prototype.createOscillator)==="undefined"&&typeof(waapisimForceSimWhenLackOsc)!=="undefined"&&waapisimForceSimWhenLackOsc)
+		||(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined")) {
 	waapisimSampleRate=44100;
 	waapisimAudioIf=0;
 	waapisimBufSize=1024;

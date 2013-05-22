@@ -37,17 +37,23 @@ Try these pages with Firefox/Opera or MSIE.
 
 ## Current Status
 
-WAAPISim is still not completed. It is tentative and partial implementation.
+* **Support** : OscillatorNode / ChannelSplitterNode / ChannelMergerNode / AudioBufferSourceNode / WaveShaperNode / AnalyserNode / GainNode / BiquadFilterNode / DelayNode / DynamicsCompressorNode / PannerNode / ScriptProcessorNode / ConvolverNode
+
+* **Not Support** : MediaElementAudioSourceNode / MediaStreamAudioSourceNode / MediaStreamAudioDestinationNode / OfflineAudioCOntext
+
+* ConvolverNode : By performance reason, convolution is executed for only IR's first 1000 samples. Sebsequent part will be replaced as simple delays.
+
+* PannerNode : Simplified. Listener position should stay default. Source positions are interpreted as x-z 2d coordinate.
+
+* ScriptProcessorNode : Input buffer size should be 1024 and under (No limitation if use output only)
+
+* DynamicsCompressorNode : A little different characteristics from Chrome's implements.
 
 * Number of channels in each nodes should be 1 (mono) or 2(stereo)
-* OscillatorNode / ChannelSplitterNode / ChannelMergerNode / AudioBufferSourceNode / WaveShaperNode / AnalyserNode / GainNode / BiquadFilterNode / DelayNode : implemented
-* DynamicsCompressorNode : Implemented but has a little different characteristics from Chrome's implements.
-* PannerNode : Simplified. Listener position should stay default. Source positions are interpreted as x-z 2d coordinate.
-* ScriptProcessorNode : Implemented. Input buffer size should be 1024 and under (No limitation if use output only)
-* ConvolverNode : By performance reason, convolution is executed for only IR's first 1000 samples. Sebsequent part will be replaced as simple delays.
+
 * createBuffer from ArrayBuffer and decodeAudioData supports only wav format.
+
 * k-rate AudioParam controls are executed only per 1024 samples frequency. a-rate AudioParams are controlled by sample.
-* MediaElementAudioSourceNode / MediaStreamAudioSourceNode / MediaStreamAudioDestinationNode / OfflineAudioCOntext : Not supported.
 
 
 ## Usage
@@ -56,7 +62,20 @@ Load the 'waapisim.js' before using the Web Audio API functions in your script.
 
 `<script type="text/javascript" src="waapisim.js"></script>`
 
-To enable fallbacking to Flash, place the 'waapisim.swf' file to same folder as 'waapisim.js'.
+To enable fallbacking to Flash, place the 'waapisim.swf' file to same folder as 'waapisim.js'.  
+
+### Options
+
+These lines should be specified before loading the 'waapisim.js'
+
+`<script type="text/javascript">waapisimLogEnable=1;</script>`  
+Enable internal log info to console.
+
+`<script type="text/javascript">waapisimForceSim=1;</script>`  
+Enable WAAPISim even if native WebAudioAPI is available.
+
+`<script type="text/javascript">waapisimForceSimWhenLackOsc=1;</script>`  
+Enable WAAPISim if native WebAudioAPI is available but lacking oscillator node (means Firefox 23).
 
 ## License
 Copyright (c) 2013 g200kg  

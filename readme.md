@@ -74,8 +74,8 @@ Enable internal log info to console.
 `<script type="text/javascript">waapisimForceSim=1;</script>`  
 Enable WAAPISim even if native WebAudioAPI is available.
 
-`<script type="text/javascript">waapisimForceSimWhenLackOsc=1;</script>`  
-Enable WAAPISim if native WebAudioAPI is available but lacking oscillator node (means Firefox 23).
+`<script type="text/javascript">waapisimForceSimWhenLackOsc=0;</script>`  
+Disable WAAPISim if native WebAudioAPI is available even lacking oscillator function (means Firefox 23). This flag is default on (=1).
 
 ## License
 Copyright (c) 2013 g200kg  

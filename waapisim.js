@@ -652,6 +652,8 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		this._actualLoopStart=0;
 		this._actualLoopEnd=0;
 		this.start=this.noteOn=this.noteGrainOn=function(w,off,dur) {
+			if(this.buffer===null)
+				return;
 			this.playbackState=1;
 			this._whenstart=w;
 			if(off>0)

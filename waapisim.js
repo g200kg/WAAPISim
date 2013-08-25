@@ -333,8 +333,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		for(l=waapisimOutBufSize*2,i=0;i<l;++i) {
 			var v=(waapisimOutBuf[i]*16384+32768)|0;
 			if(isNaN(v)) v=32768;
-			if(v>49152) v=49152;
-			if(v<16384) v=16384;
+			v = Math.min(49152, Math.max(16384, v));
 			s+=String.fromCharCode(v);
 		}
 		return s;

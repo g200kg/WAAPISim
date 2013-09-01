@@ -320,6 +320,8 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		var body=document.getElementsByTagName("BODY");
 		body[0].appendChild(div);
 		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<div style='position:fixed;right:0px;bottom:0px'> <object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=150 height=20><param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'><embed src='"+waapisimSwfPath+"' width=150 height=20 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed></object></div>";
+		if(typeof(document.getElementById("waapisim_swf").SetReturnValue)==="undefined")
+			document.getElementById("waapisim_swf").SetReturnValue=function(v){document.getElementById("waapisim_swf").impl.SetReturnValue(v);};
 	};
 	waapisimFlashOffset=function(pos) {
 		waapisimUpdateCurrentTime(pos/1000);

@@ -407,8 +407,8 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			else
 				errorCallback();
 		};
-		this.createWaveTable=function(real,imag) {
-			return new waapisimWaveTable(real,imag);
+		this.createPeriodicWave=this.createWaveTable=function(real,imag) {
+			return new waapisimPeriodicWave(real,imag);
 		};
 		this._SortNode=function() {
 			var i,j,k,n;
@@ -454,7 +454,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		this.setOrientation=function(x,y,z,ux,uy,uz) {this.ox=x;this.oy=y;this.oz=z;this.ux=ux;this.uy=uy;this.uz=uz;};
 		this.setVelocity=function(x,y,z) {};
 	};
-	waapisimWaveTable=function(real,imag) {
+	waapisimPeriodicWave=function(real,imag) {
 		var n=4096;
 		var ar=new Array(n);
 		var ai=new Array(n);
@@ -1031,7 +1031,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		this.stop=this.noteOff=function(w) {
 			this._whenstop=w;
 		};
-		this.setWaveTable=function(tab) {
+		this.setPeriodicWave=this.setWaveTable=function(tab) {
 			this.type=4;
 			this._wavtable=tab;
 		};

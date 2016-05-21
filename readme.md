@@ -61,6 +61,8 @@ Try these pages with Firefox/Opera or MSIE.
 Load the 'waapisim.js' before using the Web Audio API functions in your script.
 
 `<script type="text/javascript" src="waapisim.js"></script>`
+or
+`<script type="text/javascript" src="waapisim.min.js"></script>`
 
 To enable fallbacking to Flash, place the 'waapisim.swf' file to same folder as 'waapisim.js'.  
 
@@ -85,4 +87,7 @@ Disable WAAPISim if native WebAudioAPI is available even lacking oscillator func
 ## License
 Copyright (c) 2013 g200kg  
 <http://www.g200kg.com/>  
+
+Modified by Logue<http://logue.be>
+
 Released under the MIT License

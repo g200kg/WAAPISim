@@ -408,10 +408,11 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		};
 		this.decodeAudioData=function(audioData,successCallback,errorCallback) {
 			var buf=new waapisimAudioBuffer(audioData,false);
-			if(buf.length>0)
+			if(buf.length > 0 && typeof successCallback === 'function'){
 				successCallback(buf);
-			else
+			}else if (typeof errorCallback === 'function'){
 				errorCallback();
+			}
 		};
 		this.createPeriodicWave=this.createWaveTable=function(real,imag) {
 			return new waapisimPeriodicWave(real,imag);

@@ -309,7 +309,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			for(var i in scr) {
 				if(scr[i].src){
 					var s=scr[i].src;
-					if (s.match(/(waapisim)(\.min)?\.js$/)) {
+					if (s.match(/waapisim\.js$/)) {
 						return s.substring(0,s.length-2)+"swf";
 					}else if (s.match(/waapisim\.min\.js$/)){
 						return s.substring(0,s.length-6)+"swf";

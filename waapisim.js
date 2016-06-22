@@ -8,6 +8,9 @@
 //  FFT algo for AnalyserNode and Convolver is based on Takuya OOURA's explanation.
 //   http://www.kurims.kyoto-u.ac.jp/~ooura/fftman/index.html
 
+
+(function(window, document){
+window.AudioContext = window.AudioContext||window.webkitAudioContext||window.mozAudioContext;
 if(typeof(waapisimLogEnable)==="undefined")
 	var waapisimLogEnable=0;
 
@@ -38,24 +41,24 @@ if(typeof(waapisimLogEnable)!=="undefined"&&waapisimLogEnable)
 else
 	waapisimDebug=function(){};
 
-if(typeof(webkitAudioContext)!=="undefined") {
-	if(typeof(webkitAudioContext.prototype.createGain)==="undefined") {
-		webkitAudioContext.prototype.createScriptProcessor=webkitAudioContext.prototype.createJavaScriptNode;
-		webkitAudioContext.prototype.createGain=(function(){
-			var o=webkitAudioContext.prototype.createGainNode.call(this);
+if(typeof(window.AudioContext)!=="undefined") {
+	if(typeof(window.AudioContext.prototype.createGain)==="undefined") {
+		window.AudioContext.prototype.createScriptProcessor=window.AudioContext.prototype.createJavaScriptNode;
+		window.AudioContext.prototype.createGain=(function(){
+			var o=window.AudioContext.prototype.createGainNode.call(this);
 			o._gain=o.gain; o.gain=o._gain;
 			o.gain.setTargetAtTime=o._gain.setTargetValueAtTime;
 			return o;
 		});
-		webkitAudioContext.prototype.createDelay=(function(){
-			var o=webkitAudioContext.prototype.createDelayNode.call(this);
+		window.AudioContext.prototype.createDelay=(function(){
+			var o=window.AudioContext.prototype.createDelayNode.call(this);
 			o._delayTime=o.delayTime; o.delayTime=o._delayTime;
 			o.delayTime.setTargetAtTime=o._delayTime.setTargetValueAtTime;
 			return o;
 		});
-		webkitAudioContext.prototype._createOscillator=webkitAudioContext.prototype.createOscillator;
-		webkitAudioContext.prototype.createOscillator=(function() {
-			var o=webkitAudioContext.prototype._createOscillator.call(this);
+		window.AudioContext.prototype._createOscillator=window.AudioContext.prototype.createOscillator;
+		window.AudioContext.prototype.createOscillator=(function() {
+			var o=window.AudioContext.prototype._createOscillator.call(this);
 			o._frequency=o.frequency; o.frequency=o._frequency;
 			o.frequency.setTargetAtTime=o._frequency.setTargetValueAtTime;
 			o._detune=o.detune; o.detune=o._detune;
@@ -64,9 +67,9 @@ if(typeof(webkitAudioContext)!=="undefined") {
 			o.stop=o.noteOff;
 			return o;
 		});
-		webkitAudioContext.prototype._createBufferSource=webkitAudioContext.prototype.createBufferSource;
-		webkitAudioContext.prototype.createBufferSource=(function() {
-			var o=webkitAudioContext.prototype._createBufferSource.call(this);
+		window.AudioContext.prototype._createBufferSource=window.AudioContext.prototype.createBufferSource;
+		window.AudioContext.prototype.createBufferSource=(function() {
+			var o=window.AudioContext.prototype._createBufferSource.call(this);
 			o._playbackRate=o.playbackRate; o.playbackRate=o._playbackRate;
 			o.playbackRate.setTargetAtTime=o._playbackRate.setTargetValueAtTime;
 			o.start=function(w,off,dur) {
@@ -78,9 +81,9 @@ if(typeof(webkitAudioContext)!=="undefined") {
 			o.stop=o.noteOff;
 			return o;
 		});
-		webkitAudioContext.prototype._createBiquadFilter=webkitAudioContext.prototype.createBiquadFilter;
-		webkitAudioContext.prototype.createBiquadFilter=(function() {
-			var o=webkitAudioContext.prototype._createBiquadFilter.call(this);
+		window.AudioContext.prototype._createBiquadFilter=window.AudioContext.prototype.createBiquadFilter;
+		window.AudioContext.prototype.createBiquadFilter=(function() {
+			var o=window.AudioContext.prototype._createBiquadFilter.call(this);
 			o._frequency=o.frequency; o.frequency=o._frequency;
 			o.frequency.setTargetAtTime=o._frequency.setTargetValueAtTime;
 			o._Q=o.Q; o.Q=o._Q;
@@ -89,9 +92,9 @@ if(typeof(webkitAudioContext)!=="undefined") {
 			o.gain.setTargetAtTime=o._gain.setTargetValueAtTime;
 			return o;
 		});
-		webkitAudioContext.prototype._createDynamicsCompressor=webkitAudioContext.prototype.createDynamicsCompressor;
-		webkitAudioContext.prototype.createDynamicsCompressor=(function() {
-			var o=webkitAudioContext.prototype._createDynamicsCompressor.call(this);
+		window.AudioContext.prototype._createDynamicsCompressor=window.AudioContext.prototype.createDynamicsCompressor;
+		window.AudioContext.prototype.createDynamicsCompressor=(function() {
+			var o=window.AudioContext.prototype._createDynamicsCompressor.call(this);
 			o._threshold=o.threshold; o.threshold=o._threshold;
 			o.threshold.setTargetAtTime=o._threshold.setTargetValueAtTime;
 			o._knee=o.knee; o.knee=o._knee;
@@ -105,9 +108,8 @@ if(typeof(webkitAudioContext)!=="undefined") {
 	}
 }
 if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
-		||(typeof(AudioContext)!=="undefined"&&typeof(AudioContext.prototype.createOscillator)==="undefined"&&(typeof(waapisimForceSimWhenLackOsc)==="undefined"||(typeof(waapisimForceSimWhenLackOsc)!=="undefined"&&waapisimForceSimWhenLackOsc)))
-		||(typeof(webkitAudioContext)==="undefined" && typeof(waapisimForceSimWhenNotWebkit)!=="undefined"&&waapisimForceSimWhenNotWebkit)
-		||(typeof(webkitAudioContext)==="undefined" && typeof(AudioContext)==="undefined")) {
+		||(typeof(window.AudioContext)!=="undefined"&&typeof(window.AudioContext.prototype.createOscillator)==="undefined"&&(typeof(waapisimForceSimWhenLackOsc)==="undefined"||(typeof(waapisimForceSimWhenLackOsc)!=="undefined"&&waapisimForceSimWhenLackOsc)))
+		||(typeof(window.AudioContext)==="undefined")) {
 	waapisimSampleRate=44100;
 	waapisimAudioIf=0;
 	waapisimBufSize=1024;
@@ -305,21 +307,56 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		var scr=document.getElementsByTagName("SCRIPT");
 		if(scr&&scr.length>0) {
 			for(var i in scr) {
-				if(scr[i].src && scr[i].src.match(/waapisim\.js$/)) {
+				if(scr[i].src){
 					var s=scr[i].src;
-					return s.substring(0,s.length-2)+"swf";
+					if (s.match(/waapisim\.js$/)) {
+						return s.substring(0,s.length-2)+"swf";
+					}else if (s.match(/waapisim\.min\.js$/)){
+						return s.substring(0,s.length-6)+"swf";
+					}
 				}
 			}
 		}
 		return "";
 	};
 	waapisimAddFlashObj=function() {
-		var div=document.createElement("DIV");
-		div.setAttribute("id","WAAPISIMFLASHOBJ");
-		div.setAttribute("style","background:#ff00ff;position:static;");
-		var body=document.getElementsByTagName("BODY");
-		body[0].appendChild(div);
-		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<div style='position:fixed;right:0px;bottom:0px'> <object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=150 height=20><param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'><embed src='"+waapisimSwfPath+"' width=150 height=20 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed></object></div>";
+		var div = document.createElement('div');
+		var params = {
+			movie: waapisimSwfPath,
+			allowScriptAccess : 'always',
+			quality: 'high',
+			bgcolor: '#ffffff'
+		};
+
+		div.id = 'WAAPISIMFLASHOBJ';
+		div.style.position = 'fixed';
+		div.style.right = 0;
+		div.style.bottom = 0;
+		div.style.background = '#ffffff';
+		document.body.appendChild(div);
+
+		if (navigator.plugins && navigator.mimeTypes && navigator.mimeTypes.length) {
+			var o = document.createElement('object');
+			o.id = 'waapisim_swf';
+			o.width = 150;
+			o.height = 20;
+			o.setAttribute('data', waapisimSwfPath);
+			o.setAttribute('type', 'application/x-shockwave-flash');
+			for ( var i in params ) {
+				var p = document.createElement('param');
+				p.setAttribute('name', i);
+				p.setAttribute('value', params[i]);
+				o.appendChild(p);
+			}
+			div.appendChild(o);
+		} else {
+			// IE
+			div.innerHTML = '<object id="waapisim_swf" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="150" height="20">';
+			for ( var i in params ) {
+				div.innerHTML += '<param name="' + i + '" value="' + params[i] + ' />';
+			}
+			div.innerHTML += '</object>';
+		}
 		if(typeof(document.getElementById("waapisim_swf").SetReturnValue)==="undefined")
 			document.getElementById("waapisim_swf").SetReturnValue=function(v){document.getElementById("waapisim_swf").impl.SetReturnValue(v);};
 	};
@@ -350,7 +387,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		setInterval(waapisimInterval,10);
 		break;
 	}
-	AudioContext=webkitAudioContext=function() {
+	window.AudioContext=function() {
 		waapisimContexts.push(this);
 		this._Nodes=[];
 		this.destination=new waapisimAudioDestinationNode(this);
@@ -402,10 +439,11 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		};
 		this.decodeAudioData=function(audioData,successCallback,errorCallback) {
 			var buf=new waapisimAudioBuffer(audioData,false);
-			if(buf.length>0)
+			if(buf.length > 0 && typeof successCallback === 'function'){
 				successCallback(buf);
-			else
+			}else if (typeof errorCallback === 'function'){
 				errorCallback();
+			}
 		};
 		this.createPeriodicWave=this.createWaveTable=function(real,imag) {
 			return new waapisimPeriodicWave(real,imag);
@@ -467,7 +505,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		do {
 			ar[i]=real[j];
 			ai[i]=-imag[j];
-			for(var k=n>>1;k>(i^=k);k>>=1)
+			for(var k=n>>1;k>(i^=k);k>>=1){}
 				;
 		} while(++j<real.length);
 		var theta=2*Math.PI;
@@ -633,7 +671,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		ctx._Nodes.push(this);
 	};
 	
-	waapisimAudioBufferSource=webkitAudioBufferSourceNode=AudioBufferSourceNode=function(ctx) {
+	waapisimAudioBufferSource=AudioBufferSourceNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,0,1);
 		this._nodetype="BufSrc";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
@@ -768,7 +806,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		};
 		ctx._RegisterNode(this);
 	};
-	waapisimBiquadFilter=webkitBiquadFilterNode=BiquadFilterNode=function(ctx) {
+	waapisimBiquadFilter=BiquadFilterNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,1,1);
 		this._nodetype="Filter";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
@@ -1007,7 +1045,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			this.delayTime.Clear(false);
 		};
 	};
-	waapisimOscillator=webkitOscillatorNode=OscillatorNode=function(ctx) {
+	waapisimOscillator=OscillatorNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,0,1);
 		this._nodetype="Osc";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
@@ -1206,7 +1244,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 				this._fftrev[0]=0;
 				this._fftrev[n-1]=n-1;
 				for(i=0,j=1;j<n-1;++j) {
-					for(k=n>>1;k>(i^=k);k>>=1)
+					for(k=n>>1;k>(i^=k);k>>=1){}
 						;
 					this._fftrev[j]=i;
 				}
@@ -1251,7 +1289,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		this._bitrev[waapisimBufSize-1]=waapisimBufSize-1;
 		var i,j,k;
 		for(i=0,j=1;j<waapisimBufSize-1;++j) {
-			for(k=waapisimBufSize>>1;k>(i^=k);k>>=1)
+			for(k=waapisimBufSize>>1;k>(i^=k);k>>=1){}
 				;
 			this._bitrev[j]=i;
 		}
@@ -1287,7 +1325,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			var theta, wr, wi, xr, xi;
 			i=0;
 			for(j=1;j<n-1;j++) {
-				for(k=n>>1;k>(i^=k);k>>=1)
+				for(k=n>>1;k>(i^=k);k>>=1){}
 					;
 				if(j<i) {
 					xr=a[j];
@@ -1329,7 +1367,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			var theta=2*Math.PI;
 			i=0;
 			for(j=1;j<n-1;j++) {
-				for(k=n>>1;k>(i^=k);k>>=1)
+				for(k=n>>1;k>(i^=k);k>>=1){}
 					;
 				if(j<i) {
 					xr=ar[j];
@@ -1516,7 +1554,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			this.release.Clear(false);
 		};
 	};
-	waapisimPanner=webkitAudioPannerNode=AudioPannerNode=function(ctx) {
+	waapisimPanner=AudioPannerNode=function(ctx) {
 		waapisimAudioNode.call(this,waapisimBufSize,1,1);
 		this._nodetype="Panner";
 		waapisimDebug("create "+this._nodetype+this._nodeId);
@@ -1784,3 +1822,4 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		};
 	};
 }
+})(this, this.document);

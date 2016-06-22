@@ -1,0 +1,34 @@
+{
+  "name": "waapisim",
+  "version": "1.0.0",
+  "description": "WAAPISim is a 'WebAudioAPI' polyfill fallbacking to the 'Audio Data API', or Flash.",
+  "main": "waapisim.js",
+  "files": [
+	"readme.md",
+	"waapisim.js",
+	"waapisim.min.js",
+	"waapisim.mxml",
+	"waapisim.swf",
+	"waapisimvideo.png"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/logue/WAAPISim.git"
+  },
+  "keywords": [
+    "\"web",
+    "audio",
+    "api\"",
+    "\"audio\"",
+    "\"polyfill\""
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/logue/WAAPISim/issues"
+  },
+  "homepage": "https://github.com/logue/WAAPISim#readme"
+}

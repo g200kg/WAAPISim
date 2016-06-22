@@ -10,7 +10,7 @@
 
 
 (function(window, document){
-window.AudioContext = window.AudioContext||window.webkitAudioContext;
+window.AudioContext = window.AudioContext||window.webkitAudioContext||window.mozAudioContext;
 if(typeof(waapisimLogEnable)==="undefined")
 	var waapisimLogEnable=0;
 
@@ -309,7 +309,7 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 			for(var i in scr) {
 				if(scr[i].src){
 					var s=scr[i].src;
-					if (s.match(/waapisim\.js$/)) {
+					if (s.match(/(waapisim)(\.min)?\.js$/)) {
 						return s.substring(0,s.length-2)+"swf";
 					}else if (s.match(/waapisim\.min\.js$/)){
 						return s.substring(0,s.length-6)+"swf";
@@ -320,12 +320,43 @@ if((typeof(waapisimForceSim)!=="undefined"&&waapisimForceSim)
 		return "";
 	};
 	waapisimAddFlashObj=function() {
-		var div=document.createElement("DIV");
-		div.setAttribute("id","WAAPISIMFLASHOBJ");
-		div.setAttribute("style","background:#ff00ff;position:static;");
-		var body=document.getElementsByTagName("BODY");
-		body[0].appendChild(div);
-		document.getElementById("WAAPISIMFLASHOBJ").innerHTML="<div style='position:fixed;right:0px;bottom:0px'> <object id='waapisim_swf' CLASSID='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000' CODEBASE='http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,0,0' width=150 height=20><param name=movie value='"+waapisimSwfPath+"'><PARAM NAME=bgcolor VALUE=#FFFFFF><PARAM NAME=LOOP VALUE=false><PARAM NAME=quality VALUE=high><param name='allowScriptAccess' value='always'><embed src='"+waapisimSwfPath+"' width=150 height=20 bgcolor=#FFFFFF loop=false quality=high pluginspage='http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash' type='application/x-shockwave-flash' allowScriptAccess='always'></embed></object></div>";
+		var div = document.createElement('div');
+		var params = {
+			movie: waapisimSwfPath,
+			allowScriptAccess : 'always',
+			quality: 'high',
+			bgcolor: '#ffffff'
+		};
+
+		div.id = 'WAAPISIMFLASHOBJ';
+		div.style.position = 'fixed';
+		div.style.right = 0;
+		div.style.bottom = 0;
+		div.style.background = '#ffffff';
+		document.body.appendChild(div);
+
+		if (navigator.plugins && navigator.mimeTypes && navigator.mimeTypes.length) {
+			var o = document.createElement('object');
+			o.id = 'waapisim_swf';
+			o.width = 150;
+			o.height = 20;
+			o.setAttribute('data', waapisimSwfPath);
+			o.setAttribute('type', 'application/x-shockwave-flash');
+			for ( var i in params ) {
+				var p = document.createElement('param');
+				p.setAttribute('name', i);
+				p.setAttribute('value', params[i]);
+				o.appendChild(p);
+			}
+			div.appendChild(o);
+		} else {
+			// IE
+			div.innerHTML = '<object id="waapisim_swf" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="150" height="20">';
+			for ( var i in params ) {
+				div.innerHTML += '<param name="' + i + '" value="' + params[i] + ' />';
+			}
+			div.innerHTML += '</object>';
+		}
 		if(typeof(document.getElementById("waapisim_swf").SetReturnValue)==="undefined")
 			document.getElementById("waapisim_swf").SetReturnValue=function(v){document.getElementById("waapisim_swf").impl.SetReturnValue(v);};
 	};

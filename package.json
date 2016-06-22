@@ -6,6 +6,7 @@
   "files": [
 	"readme.md",
 	"waapisim.js",
+	"waapisim.min.js",
 	"waapisim.mxml",
 	"waapisim.swf",
 	"waapisimvideo.png"
@@ -15,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/capnmidnight/WAAPISim.git"
+    "url": "git+https://github.com/logue/WAAPISim.git"
   },
   "keywords": [
     "\"web",
@@ -27,7 +28,7 @@
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/capnmidnight/WAAPISim/issues"
+    "url": "https://github.com/logue/WAAPISim/issues"
   },
-  "homepage": "https://github.com/capnmidnight/WAAPISim#readme"
+  "homepage": "https://github.com/logue/WAAPISim#readme"
 }
